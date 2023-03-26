@@ -350,6 +350,7 @@ exit(int status, char* exit_msg)
 {
   struct proc *p = myproc();
   argstr(1,p->exit_msg,32);
+  printf("msg in exit() %s \n", p->exit_msg);
 
   if(p == initproc)
     panic("init exiting");
@@ -414,12 +415,17 @@ wait(uint64 addr, uint64 addr2)
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
                                   sizeof(pp->xstate)) < 0 
                                   // OUR CODE
-                                  && copyout(p->pagetable, addr2, pp->exit_msg,
-                                  sizeof(pp->exit_msg)) < 0 ) {
+                                  && addr2 != 0 && copyout(p->pagetable, addr2, pp->exit_msg,
+                                  32) < 0 ) {
             release(&pp->lock);
             release(&wait_lock);
             return -1;
           }
+
+          printf("in wait(), msg is: %s \n", pp->exit_msg);
+          printf("in wait(), addr is: %d \n", addr);
+          printf("in wait(), addr2 is: %d \n", addr2);
+
           freeproc(pp);
           release(&pp->lock);
           release(&wait_lock);

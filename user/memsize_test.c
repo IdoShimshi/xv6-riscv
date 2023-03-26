@@ -16,5 +16,5 @@ int main(int argc, char *argv[])
     msize = memsize();
     printf("after free: %d\n",msize);
 
-    exit(0);
+    exit(0,0);
 }
