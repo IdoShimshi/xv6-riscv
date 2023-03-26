@@ -147,6 +147,9 @@ main(void)
 {
   static char buf[100];
   int fd;
+  //OUR code
+  int justint;
+  char exit_msg[32];
 
   // Ensure that three file descriptors are open.
   while((fd = open("console", O_RDWR)) >= 0){
@@ -167,7 +170,7 @@ main(void)
     }
     if(fork1() == 0)
       runcmd(parsecmd(buf));
-    wait(0);
+    wait(&justint, exit_msg);
   }
   exit(0);
 }

@@ -3,5 +3,9 @@
         "types.h": "c",
         "riscv.h": "c",
         "defs.h": "c",
+        "exception": "c",
+        "new": "c",
+        "proc.h": "c",
+        "stat.h": "c"
     },
 }
