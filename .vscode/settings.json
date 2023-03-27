@@ -6,6 +6,7 @@
         "exception": "c",
         "new": "c",
         "proc.h": "c",
-        "stat.h": "c"
+        "stat.h": "c",
+        "user.h": "c"
     },
 }

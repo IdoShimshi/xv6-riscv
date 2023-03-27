@@ -149,7 +149,8 @@ main(void)
   int fd;
   //OUR code
   char exit_msg[32];
-  int justint=1;
+  exit_msg[0] = '\0';
+  int justint;
 
 
   // Ensure that three file descriptors are open.
@@ -172,12 +173,8 @@ main(void)
     if(fork1() == 0)
       runcmd(parsecmd(buf));
     wait(&justint, exit_msg);
-    printf("in shell, addr is: %d \n", &exit_msg);
-    printf("in shell, char[0] is: %d \n", exit_msg[0]);
-    printf("in shell, char[1] is: %d \n", exit_msg[1]);
-    printf("in shell, char[2] is: %d \n", exit_msg[2]);
-    printf("in shell, text is char is: %s \n", exit_msg);
-    fprintf(2, "%s\n", (char*)exit_msg);
+    if (exit_msg[0] != '\0')
+      fprintf(2, "%s\n", (char*)exit_msg);
   }
   exit(0,0);
 }
