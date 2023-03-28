@@ -91,7 +91,10 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
-  char exit_msg[32];
+  // OUR CODE
+  char exit_msg[32];           // Exit message to be returned to parent's wait
+  long long accumulator;       // Accumulates how much cpu time the proccess has used fully
+  int ps_priority;             // Procces's priorty
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

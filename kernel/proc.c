@@ -15,6 +15,9 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
+long long smallest_accumulator = 0;
+struct spinlock accum_lock;
+
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
@@ -124,6 +127,11 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->ps_priority = 5;
+  acquire(&accum_lock);
+  p->accumulator = smallest_accumulator;
+  release(&accum_lock);
+  
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -463,23 +471,81 @@ scheduler(void)
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-
+    long long min_runnable_accum = -1;
+    long long min_running_accum = -1;
+    struct proc *nextp;
+    struct proc *runningp;
+    int found_runnables = 0;
     for(p = proc; p < &proc[NPROC]; p++) {
+      // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+        found_runnables += 1;
+        if(p->accumulator < min_runnable_accum || min_runnable_accum == -1){
+          nextp = p;
+          min_runnable_accum = p->accumulator;
+        }
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+        // // Switch to chosen process.  It is the process's job
+        // // to release its lock and then reacquire it
+        // // before jumping back to us.
+        // p->state = RUNNING;
+        // c->proc = p;
+        // swtch(&c->context, &p->context);
+
+        // // Process is done running for now.
+        // // It should have changed its p->state before coming back.
+        // c->proc = 0;
+      }
+      if(p->state == RUNNING) {
+        found_runnables += 1;
+        if(p->accumulator < min_running_accum || min_running_accum == -1){
+          runningp = p;
+          min_running_accum = p->accumulator;
+        }
       }
       release(&p->lock);
     }
+    
+    if (found_runnables == 1){
+      // If only one RUNNABLE or RUNNING, set accumulator to 0
+      if (min_running_accum == -1){
+        acquire(&nextp->lock);
+        nextp->accumulator = 0;
+        release(&nextp->lock);
+        min_runnable_accum = 0;
+      }
+      else{
+        acquire(&runningp->lock);
+        runningp->accumulator = 0;
+        release(&runningp->lock);
+        min_running_accum = 0;
+      }
+    }
+    long long min_accum;
+    if (min_running_accum == -1 || min_runnable_accum < min_running_accum)
+      min_accum = min_runnable_accum;
+    else
+      min_accum = min_running_accum;
+    
+    // update global smallest_accumulator with the min_accum found 
+    acquire(&accum_lock);
+    smallest_accumulator = min_accum;
+    release(&accum_lock);
+
+    acquire(&nextp->lock);
+    // Switch to chosen process.  It is the process's job
+    // to release its lock and then reacquire it
+    // before jumping back to us.
+    nextp->state = RUNNING;
+    c->proc = nextp;
+    swtch(&c->context, &nextp->context);
+
+    // Process is done running for now.
+    // It should have changed its p->state before coming back.
+    c->proc = 0;
+    release(&nextp->lock);
+
   }
 }
 
@@ -584,6 +650,9 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
+        acquire(&accum_lock);
+        p->accumulator = smallest_accumulator;
+        release(&accum_lock);
         p->state = RUNNABLE;
       }
       release(&p->lock);
