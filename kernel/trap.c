@@ -79,8 +79,6 @@ usertrap(void)
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2){
     p->accumulator += p->ps_priority;
-    printf("in usertrap with p: %s ,%d\n",p->name, p->ps_priority);
-    
     yield();
   }
 

@@ -131,7 +131,6 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->ps_priority = 5;
-  printf("new proc created %d",p->pid );
   
   p->accumulator = smallest_accumulator;
   
@@ -483,14 +482,14 @@ scheduler(void)
     nextp = 0;
     runningp = 0;
     found_runnables = 0;
-    printf("starting loop on cpu:%p\n",c);
+    // printf("starting loop on cpu:%p\n",c);
     for(p = proc; p < &proc[NPROC]; p++) {
       // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
       acquire(&p->lock);
 
-      if(p->state != UNUSED) {
-        printf("in loop on cpu: %p, with p: %s ,%d\n",c,p->name, p->accumulator);
-      }
+      // if(p->state != UNUSED) {
+      //   printf("in loop on cpu: %p, with p: %s ,%d\n",c,p->name, p->accumulator);
+      // }
       
       if(p->state == RUNNABLE) {
         found_runnables += 1;
@@ -556,7 +555,7 @@ scheduler(void)
       if (nextp->state == RUNNABLE)
       {
       
-        printf("after loop on cpu: %p, with p: %s ,%d\n",c,nextp->name, nextp->accumulator);
+        // printf("after loop on cpu: %p, with p: %s ,%d\n",c,nextp->name, nextp->accumulator);
         
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
@@ -568,8 +567,8 @@ scheduler(void)
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
-        release(&nextp->lock);
       }
+      release(&nextp->lock);
     }
   }
 }
