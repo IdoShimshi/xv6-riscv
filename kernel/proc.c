@@ -54,6 +54,7 @@ procinit(void)
   
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&accum_lock, "accum_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
@@ -128,11 +129,9 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->ps_priority = 5;
-  acquire(&accum_lock);
-  p->accumulator = smallest_accumulator;
-  release(&accum_lock);
   
-
+  p->accumulator = smallest_accumulator;
+  
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -473,12 +472,18 @@ scheduler(void)
     intr_on();
     long long min_runnable_accum = -1;
     long long min_running_accum = -1;
-    struct proc *nextp;
-    struct proc *runningp;
+    struct proc *nextp=0;
+    struct proc *runningp=0;
     int found_runnables = 0;
+    printf("starting loop on cpu:%p\n",c);
     for(p = proc; p < &proc[NPROC]; p++) {
       // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
       acquire(&p->lock);
+
+      if(p->state != UNUSED) {
+        printf("in loop on cpu: %p, with p: %s ,%d\n",c,p->name, p->accumulator);
+      }
+      
       if(p->state == RUNNABLE) {
         found_runnables += 1;
         if(p->accumulator < min_runnable_accum || min_runnable_accum == -1){
@@ -497,13 +502,14 @@ scheduler(void)
         // // It should have changed its p->state before coming back.
         // c->proc = 0;
       }
-      if(p->state == RUNNING) {
+      else if(p->state == RUNNING) {
         found_runnables += 1;
         if(p->accumulator < min_running_accum || min_running_accum == -1){
           runningp = p;
           min_running_accum = p->accumulator;
         }
       }
+      
       release(&p->lock);
     }
     
@@ -527,25 +533,29 @@ scheduler(void)
       min_accum = min_runnable_accum;
     else
       min_accum = min_running_accum;
-    
+
     // update global smallest_accumulator with the min_accum found 
     acquire(&accum_lock);
     smallest_accumulator = min_accum;
     release(&accum_lock);
 
-    acquire(&nextp->lock);
-    // Switch to chosen process.  It is the process's job
-    // to release its lock and then reacquire it
-    // before jumping back to us.
-    nextp->state = RUNNING;
-    c->proc = nextp;
-    swtch(&c->context, &nextp->context);
+    
+    if (nextp != 0){
+      acquire(&nextp->lock);
+      printf("after loop on cpu: %p, with p: %s ,%d\n",c,nextp->name, nextp->accumulator);
+      
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      nextp->state = RUNNING;
+      c->proc = nextp;
+      swtch(&c->context, &nextp->context);
 
-    // Process is done running for now.
-    // It should have changed its p->state before coming back.
-    c->proc = 0;
-    release(&nextp->lock);
-
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&nextp->lock);
+    }
   }
 }
 
@@ -650,9 +660,7 @@ wakeup(void *chan)
     if(p != myproc()){
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
-        acquire(&accum_lock);
         p->accumulator = smallest_accumulator;
-        release(&accum_lock);
         p->state = RUNNABLE;
       }
       release(&p->lock);
