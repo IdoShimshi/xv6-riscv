@@ -156,7 +156,6 @@ kerneltrap()
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
     struct proc* p = myproc();
     p->accumulator += p->ps_priority;
-    printf("in trap with p: %s ,%d\n",p->name, p->ps_priority);
     yield();
   }
 

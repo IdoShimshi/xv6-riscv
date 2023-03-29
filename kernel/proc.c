@@ -784,3 +784,15 @@ procdump(void)
     printf("\n");
   }
 }
+
+
+// our new exit METHOD
+void
+set_ps_priority(int newVal)
+{
+  struct proc *p = myproc();
+  p->ps_priority = newVal;
+  printf("my new priority: %d\n", p->ps_priority);
+}
+
+

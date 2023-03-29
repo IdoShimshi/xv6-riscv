@@ -100,3 +100,15 @@ sys_memsize(void)
 {
   return myproc()->sz;
 }
+
+
+// set process priority to input val
+uint64
+sys_set_ps_priority(void)
+{
+  int set_value;
+  argint(0, &set_value);
+  set_ps_priority(set_value);
+  return 0;
+} 
+
