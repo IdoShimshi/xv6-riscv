@@ -455,62 +455,34 @@ wait(uint64 addr, uint64 addr2)
   }
 }
 
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run.
-//  - swtch to start running that process.
-//  - eventually that process transfers control
-//    via swtch back to the scheduler.
-void
-scheduler(void)
-{
+//Schedule policies:
+void scheduler_xv6(void){
+
+}
+
+void scheduler_accum(void){
   struct proc *p;
   struct cpu *c = mycpu();
-  long long min_runnable_accum;
-  long long min_running_accum;
-  struct proc *nextp;
-  struct proc *runningp;
-  int found_runnables;
-  
   c->proc = 0;
-  for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
-    min_runnable_accum = -1;
-    min_running_accum = -1;
-    nextp = 0;
-    runningp = 0;
-    found_runnables = 0;
-    // printf("starting loop on cpu:%p\n",c);
-    for(p = proc; p < &proc[NPROC]; p++) {
+  long long min_runnable_accum = -1;
+  long long min_running_accum = -1;
+  struct proc *nextp = 0;
+  struct proc *runningp = 0;
+  int found_runnables = 0;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
       // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
       acquire(&p->lock);
-
-      // if(p->state != UNUSED) {
-      //   printf("in loop on cpu: %p, with p: %s ,%d\n",c,p->name, p->accumulator);
-      // }
       
       if(p->state == RUNNABLE) {
-        found_runnables += 1;
+        found_runnables++;
         if(p->accumulator < min_runnable_accum || min_runnable_accum == -1){
           nextp = p;
           min_runnable_accum = p->accumulator;
         }
-
-        // // Switch to chosen process.  It is the process's job
-        // // to release its lock and then reacquire it
-        // // before jumping back to us.
-        // p->state = RUNNING;
-        // c->proc = p;
-        // swtch(&c->context, &p->context);
-
-        // // Process is done running for now.
-        // // It should have changed its p->state before coming back.
-        // c->proc = 0;
       }
       else if(p->state == RUNNING) {
-        found_runnables += 1;
+        found_runnables++;
         if(p->accumulator < min_running_accum || min_running_accum == -1){
           runningp = p;
           min_running_accum = p->accumulator;
@@ -519,7 +491,7 @@ scheduler(void)
       
       release(&p->lock);
     }
-    
+
     if (found_runnables == 1){
       // If only one RUNNABLE or RUNNING, set accumulator to 0
       if (min_running_accum == -1){
@@ -549,14 +521,10 @@ scheduler(void)
       release(&accum_lock);
     }
     
-    
     if (nextp != 0){
       acquire(&nextp->lock);
       if (nextp->state == RUNNABLE)
       {
-      
-        // printf("after loop on cpu: %p, with p: %s ,%d\n",c,nextp->name, nextp->accumulator);
-        
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -570,6 +538,132 @@ scheduler(void)
       }
       release(&nextp->lock);
     }
+}
+// XV6's original scheduling policy.
+// Uses RoundRobing to find the first RUNNABLE process
+void xv6SchedPolicy(struct proc *p, struct cpu *c){
+  for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&p->lock);
+    }
+}
+// Assignment1 task5's scheduling policy using accumulators.
+// Finds the process with the lowest accumulator and updates the global lowest.
+void accumSchedPolicy(struct proc *p, struct cpu *c){
+  // two pointers and mins required to keep track of minimum accum
+  // change it if needed and also run the lowest RUNNABLE
+  long long min_runnable_accum = -1;
+  long long min_running_accum = -1;
+  struct proc *nextp = 0;
+  struct proc *runningp = 0;
+  int found_runnables = 0;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
+    acquire(&p->lock);
+    
+    if(p->state == RUNNABLE) {
+      found_runnables++;
+      if(p->accumulator < min_runnable_accum || min_runnable_accum == -1){
+        nextp = p;
+        min_runnable_accum = p->accumulator;
+      }
+    }
+    else if(p->state == RUNNING) {
+      found_runnables++;
+      if(p->accumulator < min_running_accum || min_running_accum == -1){
+        runningp = p;
+        min_running_accum = p->accumulator;
+      }
+    }
+    
+    release(&p->lock);
+  }
+  
+  if (found_runnables == 1){
+    // If only one RUNNABLE or RUNNING, set accumulator to 0
+    if (min_running_accum == -1){
+      acquire(&nextp->lock);
+      nextp->accumulator = 0;
+      release(&nextp->lock);
+    }
+    else{
+      acquire(&runningp->lock);
+      runningp->accumulator = 0;
+      release(&runningp->lock);
+    }
+    min_runnable_accum = 0;
+    min_running_accum = 0;
+  }
+  // get lowest accum found for both running and runnable.
+  if (found_runnables != 0){
+    long long min_accum;
+    if (min_running_accum == -1 || min_runnable_accum < min_running_accum)
+      min_accum = min_runnable_accum;
+    else
+      min_accum = min_running_accum;
+
+    // update global smallest_accumulator with the min_accum found 
+    acquire(&accum_lock);
+    smallest_accumulator = min_accum;
+    release(&accum_lock);
+  }
+  
+  // if next == 0, then no RUNNABLE proc found.
+  if (nextp != 0){
+    acquire(&nextp->lock);
+    if (nextp->state == RUNNABLE)
+    {
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      nextp->state = RUNNING;
+      c->proc = nextp;
+      swtch(&c->context, &nextp->context);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&nextp->lock);
+  }
+}
+// Per-CPU process scheduler.
+// Each CPU calls scheduler() after setting itself up.
+// Scheduler never returns.  It loops, doing:
+//  - choose a process to run.
+//  - swtch to start running that process.
+//  - eventually that process transfers control
+//    via swtch back to the scheduler.
+void
+scheduler(void)
+{
+  struct proc *p = 0;
+  struct cpu *c = mycpu();
+  // long long min_runnable_accum;
+  // long long min_running_accum;
+  // struct proc *nextp;
+  // struct proc *runningp;
+  // int found_runnables;
+  
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+    
+    accumSchedPolicy(p,c);
   }
 }
 
