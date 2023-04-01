@@ -24,6 +24,10 @@ int sleep(int);
 int uptime(void);
 int memsize(void);
 int set_ps_priority(int);
+int set_cfs_priority(int);
+
+
+
 
 // ulib.c
 int stat(const char*, struct stat*);

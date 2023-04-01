@@ -5,5 +5,6 @@
 int main(int argc, char *argv[])
 {
   set_ps_priority(69);
+  set_cfs_priority(4);
   exit(0,"amitay_test_ended");
 }

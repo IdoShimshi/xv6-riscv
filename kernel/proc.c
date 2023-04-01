@@ -130,9 +130,14 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+
   p->ps_priority = 5;
-  
   p->accumulator = smallest_accumulator;
+
+  p->rtime = 0;
+  p->stime = 0;
+  p->retime = 0;
+
   
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -245,6 +250,8 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
+
+  p->cfs_priority = 100;
   
   // allocate one user page and copy initcode's instructions
   // and data into it.
@@ -296,6 +303,7 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
+  
 
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
@@ -328,6 +336,7 @@ fork(void)
   release(&wait_lock);
 
   acquire(&np->lock);
+  np->cfs_priority = p->cfs_priority;
   np->state = RUNNABLE;
   release(&np->lock);
 
@@ -806,3 +815,26 @@ set_ps_priority(int newVal)
 }
 
 
+// set cfs priority application
+// set process cfs priority to 0(75)/1(100)/(2)125
+// return 0 on success, -1 on failure
+int
+set_cfs_priority(int priorityInt)
+{
+  struct proc *p = myproc();
+  if(priorityInt == 0)
+    p->cfs_priority = 75;
+  else if(priorityInt == 1)
+    p->cfs_priority = 100;
+  else if(priorityInt == 2)
+    p->cfs_priority = 125;
+  //not valid int for setting. return FAILURE
+  else{
+    printf("ERROR: CFS_priority entered value not valid %d\n", priorityInt);
+    return -1;
+  }
+  // valid value entered and set is above
+  // print for debug only and return 0
+  printf("my new CFS_priority: %d\n", p->cfs_priority);
+  return 0;
+}

@@ -95,6 +95,12 @@ struct proc {
   char exit_msg[32];           // Exit message to be returned to parent's wait
   long long accumulator;       // Accumulates how much cpu time the proccess has used fully
   int ps_priority;             // Procces's priorty
+  
+  int cfs_priority;
+  uint rtime;
+  uint stime;
+  uint retime;
+  uint state_change_time;
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

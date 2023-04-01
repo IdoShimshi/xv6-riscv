@@ -112,3 +112,12 @@ sys_set_ps_priority(void)
   return 0;
 } 
 
+uint64
+sys_set_cfs_priority(void)
+{
+  int set_value;
+  argint(0, &set_value);
+  set_cfs_priority(set_value);
+  return 0;
+} 
+
