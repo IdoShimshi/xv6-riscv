@@ -100,7 +100,6 @@ struct proc {
   uint rtime;
   uint stime;
   uint retime;
-  uint state_change_time;
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

@@ -565,6 +565,50 @@ void accumSchedPolicy(struct proc *p, struct cpu *c){
     release(&nextp->lock);
   }
 }
+
+// Assignment1 task6's scheduling policy using CFS.
+// Finds the process with the lowest vruntime and updates the global lowest.
+// vruntime = decay factor * (runtime/(runtime + sleep time + runnable time))
+void cfsSchedPolicy(struct proc *p, struct cpu *c){
+  uint minVruntime = 0;
+  struct proc *minp = 0;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
+    acquire(&p->lock);
+    
+    if(p->state == RUNNABLE) {
+      uint vruntime = p->cfs_priority * ((p->rtime)/(p->rtime + p->stime + p->retime));
+
+      if(vruntime < minVruntime || minVruntime == 0){
+        minp = p;
+        minVruntime = vruntime;
+      }
+    }
+    
+    release(&p->lock);
+  }
+  
+  // if next == 0, then no RUNNABLE proc found.
+  if (minp != 0){
+    acquire(&minp->lock);
+    if (minp->state == RUNNABLE)
+    {
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      minp->state = RUNNING;
+      c->proc = minp;
+      swtch(&c->context, &minp->context);
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&minp->lock);
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -588,7 +632,7 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     
-    accumSchedPolicy(p,c);
+    cfsSchedPolicy(p,c);
   }
 }
 
@@ -837,4 +881,48 @@ set_cfs_priority(int priorityInt)
   // print for debug only and return 0
   printf("my new CFS_priority: %d\n", p->cfs_priority);
   return 0;
+}
+
+// Updates each procs rtime,stime or retime according
+// to its state at the time of a clock tick
+void updateProcTimes(){
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+
+      if(p->state == RUNNING) 
+        p->rtime++;
+      else if (p->state == SLEEPING)
+        p->stime++;
+      else if (p->state == RUNNABLE)
+        p->retime++;
+      
+      release(&p->lock);
+    }
+}
+
+int get_cfs_stats(int pid, uint64 addr){
+  struct proc *p;
+  int ret[4];
+  
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid){
+      ret[0] = p->cfs_priority;
+      ret[1] = p->rtime;
+      ret[2] = p->stime;
+      ret[3] = p->retime;
+      if (addr != 0 && copyout(p->pagetable, addr, (char*) ret,
+          (sizeof(p->cfs_priority) + (sizeof(p->rtime) * 3))) < 0){
+        release(&p->lock);
+        return -1;
+      }
+      else{
+        release(&p->lock);
+        return 0;
+      }
+    }
+    release(&p->lock);
+  }
+  return -1;
 }

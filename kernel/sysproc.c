@@ -121,3 +121,12 @@ sys_set_cfs_priority(void)
   return 0;
 } 
 
+uint64
+sys_get_cfs_stats(void)
+{
+  int pid;
+  uint64 p;
+  argint(0, &pid);
+  argaddr(1, &p);
+  return get_cfs_stats(pid, p);
+} 
