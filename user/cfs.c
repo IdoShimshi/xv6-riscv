@@ -19,7 +19,12 @@ int main(int argc, char *argv[])
     for(loop_count=1;loop_count<11;loop_count++){
         for(j=1;j<100001;j++){}
         sleep(10);
-    }    
+        // you can make the print sepratly:
+        //sleep(getpid()*2);
+    }
+    int buffer[4];
+    get_cfs_stats(getpid(),buffer);
+    printf("Child proc pid:%d priority:%d rtime: %d stime: %d retime:%d \n",getpid(),buffer[0],buffer[1],buffer[2],buffer[3]); 
     exit(0,"exit_child");
   }
   // FATHER WAIT
