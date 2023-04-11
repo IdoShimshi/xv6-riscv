@@ -532,13 +532,15 @@ void accumSchedPolicy(struct proc *p, struct cpu *c){
     min_runnable_accum = 0;
     min_running_accum = 0;
   }
+
+  
   // get lowest accum found for both running and runnable.
   if (found_runnables != 0){
     long long min_accum;
-    if (min_running_accum == -1 || min_runnable_accum < min_running_accum)
+    if (min_running_accum == -1 || (min_runnable_accum >= 0 && min_runnable_accum < min_running_accum))
       min_accum = min_runnable_accum;
     else
-      min_accum = min_running_accum;
+      min_accum = min_running_accum; 
 
     // update global smallest_accumulator with the min_accum found 
     acquire(&accum_lock);
@@ -568,19 +570,27 @@ void accumSchedPolicy(struct proc *p, struct cpu *c){
 
 // Assignment1 task6's scheduling policy using CFS.
 // Finds the process with the lowest vruntime and updates the global lowest.
-// vruntime = decay factor * (runtime/(runtime + sleep time + runnable time))
+// vruntime = decay factor * (runtime/(runtime + sleep time + runnable time))aaa
 void cfsSchedPolicy(struct proc *p, struct cpu *c){
-  uint minVruntime = 0;
+  uint minVruntime = -1;
   struct proc *minp = 0;
+
 
   for(p = proc; p < &proc[NPROC]; p++) {
     // New schedule policy. look for the RUNNABLE procces with the lowest accumulator.
     acquire(&p->lock);
     
     if(p->state == RUNNABLE) {
-      uint vruntime = p->cfs_priority * ((p->rtime)/(p->rtime + p->stime + p->retime));
+      uint vruntime;
+      if (p->rtime + p->stime + p->retime == 0){
+        vruntime = 0;
+      }
+      else{
+        vruntime = (p->cfs_priority * p->rtime)/(p->rtime + p->stime + p->retime);
+      }
+      
 
-      if(vruntime < minVruntime || minVruntime == 0){
+      if(vruntime < minVruntime || minVruntime == -1){
         minp = p;
         minVruntime = vruntime;
       }
@@ -856,7 +866,7 @@ set_ps_priority(int newVal)
 {
   struct proc *p = myproc();
   p->ps_priority = newVal;
-  printf("my new priority: %d\n", p->ps_priority);
+  // printf("my new priority: %d\n", p->ps_priority);
 }
 
 
@@ -880,7 +890,7 @@ set_cfs_priority(int priorityInt)
   }
   // valid value entered and set is above
   // print for debug only and return 0
-  printf("my new CFS_priority: %d\n", p->cfs_priority);
+  // printf("my new CFS_priority: %d\n", p->cfs_priority);
   return 0;
 }
 
@@ -888,10 +898,14 @@ set_cfs_priority(int priorityInt)
 // to its state at the time of a clock tick
 void updateProcTimes(){
   struct proc *p;
+  
   for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNING) 
+      
+      if(p->state == RUNNING) {
         p->rtime++;
+      }
+        
       else if (p->state == SLEEPING)
         p->stime++;
       else if (p->state == RUNNABLE)
@@ -936,7 +950,5 @@ int set_policy(int policy){
     return -1;
   }
   // valid value entered and set is above
-  // print for debug only and return 0
-  printf("my new schedPolicy: %d\n", schedPolicy);
   return 0;
 }

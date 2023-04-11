@@ -78,8 +78,8 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2){
-    printf("here---------------------------------\n");
-    updateProcTimes();
+    //  printf("cpu:%p got here\n",mycpu());
+    // updateProcTimes();
     p->accumulator += p->ps_priority;
     yield();
   }
@@ -154,10 +154,10 @@ kerneltrap()
     panic("kerneltrap");
   }
 
+  
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
-    printf("here#########################################\n");
-    updateProcTimes();
+    
     struct proc* p = myproc();
     p->accumulator += p->ps_priority;
     yield();
@@ -176,7 +176,7 @@ clockintr()
 {
   acquire(&tickslock);
   ticks++;
-  // updateProcTimes();
+  updateProcTimes();
   wakeup(&ticks);
   // updateProcTimes();
   release(&tickslock);
