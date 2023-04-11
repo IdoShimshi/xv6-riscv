@@ -18,7 +18,7 @@ struct spinlock pid_lock;
 long long smallest_accumulator = 0;
 struct spinlock accum_lock;
 
-
+int schedPolicy = 0;
 
 extern void forkret(void);
 static void freeproc(struct proc *p);
@@ -621,18 +621,19 @@ scheduler(void)
 {
   struct proc *p = 0;
   struct cpu *c = mycpu();
-  // long long min_runnable_accum;
-  // long long min_running_accum;
-  // struct proc *nextp;
-  // struct proc *runningp;
-  // int found_runnables;
   
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    
-    cfsSchedPolicy(p,c);
+    if (schedPolicy == 0)
+      xv6SchedPolicy(p,c);
+    else if (schedPolicy == 1)
+      accumSchedPolicy(p,c);
+    else if (schedPolicy == 2)
+      cfsSchedPolicy(p,c);
+    else
+      panic("wrong scheduling policy");
   }
 }
 
@@ -889,14 +890,13 @@ void updateProcTimes(){
   struct proc *p;
   for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-
       if(p->state == RUNNING) 
         p->rtime++;
       else if (p->state == SLEEPING)
         p->stime++;
       else if (p->state == RUNNABLE)
         p->retime++;
-      
+
       release(&p->lock);
     }
 }
@@ -925,4 +925,18 @@ int get_cfs_stats(int pid, uint64 addr){
     release(&p->lock);
   }
   return -1;
+}
+
+int set_policy(int policy){
+  if (policy <= 2 && policy >= 0)
+    schedPolicy = policy;
+  //not valid int for setting. return FAILURE
+  else{
+    printf("ERROR: set_policy entered value not valid %d\n", policy);
+    return -1;
+  }
+  // valid value entered and set is above
+  // print for debug only and return 0
+  printf("my new schedPolicy: %d\n", schedPolicy);
+  return 0;
 }

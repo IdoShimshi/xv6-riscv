@@ -807,6 +807,7 @@ killstatus(char *s)
     sleep(1);
     kill(pid1);
     wait(&xst,0);
+    printf("here %d\n", i);
     if(xst != -1) {
        printf("%s: status should be -1\n", s);
        exit(1,0);
@@ -3077,6 +3078,7 @@ drivetests(int quick, int continuous, char *justone) {
 int
 main(int argc, char *argv[])
 {
+  set_policy(1);
   int continuous = 0;
   int quick = 0;
   char *justone = 0;

@@ -110,6 +110,7 @@ void            set_ps_priority(int);
 int             set_cfs_priority(int);
 void            updateProcTimes(void);
 int             get_cfs_stats(int pid, uint64 addr);
+int             set_policy(int policy);
 
 
 // swtch.S
@@ -192,3 +193,5 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+// int schedPolicy = 0;

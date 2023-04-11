@@ -130,3 +130,14 @@ sys_get_cfs_stats(void)
   argaddr(1, &p);
   return get_cfs_stats(pid, p);
 } 
+
+uint64
+sys_set_policy(void)
+{
+  int set_value;
+  argint(0, &set_value);
+  set_policy(set_value);
+  return 0;
+} 
+
+

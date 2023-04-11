@@ -4,12 +4,14 @@
 
 int main(int argc, char *argv[])
 {
+  set_policy(2);
   int i=0;
   int j=0;
   int loop_count=0;
   int main_pid = getpid();
-  while(i<3 && getpid() == main_pid)  {
-    set_cfs_priority(i);
+  while(i<15 && getpid() == main_pid)  {
+    set_cfs_priority(i%3);
+    sleep(1);
     fork();
     i++;
   }

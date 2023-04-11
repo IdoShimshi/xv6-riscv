@@ -26,6 +26,8 @@ int memsize(void);
 int set_ps_priority(int);
 int set_cfs_priority(int);
 int get_cfs_stats(int, int*);
+int set_policy(int);
+
 
 
 
