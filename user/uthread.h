@@ -1,5 +1,6 @@
 #define STACK_SIZE  4000
 #define MAX_UTHREADS  4
+#include "kernel/types.h"
 
 enum sched_priority { LOW, MEDIUM, HIGH };
 
@@ -31,6 +32,7 @@ struct uthread {
     enum tstate         state;          // FREE, RUNNING, RUNNABLE
     struct context      context;        // uswtch() here to run process
     enum sched_priority priority;       // scheduling priority
+    int tid;                            // Thread ID
 };
 
 extern void uswtch(struct context*, struct context*);
