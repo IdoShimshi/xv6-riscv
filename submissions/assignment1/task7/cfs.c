@@ -4,7 +4,6 @@
 
 
 int longFunction(){
-  
   long long i, j, n, k;
     n = 100000; // number of iterations
     k = 0;
@@ -23,7 +22,6 @@ int longFunction(){
 
 int main(int argc, char *argv[])
 {
-  printf("test starting\n");
   // set_policy(2);
   int num_of_procs = 3;
   if (argc == 2){
@@ -35,7 +33,7 @@ int main(int argc, char *argv[])
   for(i=0; i < num_of_procs && getpid() == main_pid; i++) {
     set_cfs_priority(i%3);
     
-    sleep(1);
+    // sleep(10);
     if (fork() ==0){
       set_ps_priority(2*(i%3)+5);
     }
