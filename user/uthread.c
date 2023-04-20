@@ -5,6 +5,7 @@ struct uthread uthreadList[MAX_UTHREADS];
 struct uthread *curThread;
 
 int nexttid = 1;
+long long globalRound = 0;
 
 void thread_start(void (*start_func)()) {
   start_func();
@@ -71,3 +72,73 @@ int uthread_start_all(){
     }
     return -1;
 }
+
+void uthread_yield(){
+  struct uthread *t;
+  struct uthread *oldThread = uthread_self();
+  struct uthread *bestThread = uthreadList;
+  int bestPriority = -1;
+  int bestThreadPid = 0;
+  long long bestRound = 0;
+  int livingProcessCount = 0;
+  globalRound++;
+  oldThread->state = RUNNABLE;
+
+  if(bestThread->state == RUNNABLE){
+    bestThreadPid = bestThread->tid;
+    bestRound = bestThread->mylastRound;
+    bestPriority = bestThread->priority;
+  }
+  // policy= pick the best thread to run
+  for(t = uthreadList; t < &uthreadList[MAX_UTHREADS]; t++) {
+    // count living threads
+    if(t->state != FREE)
+      livingProcessCount++;
+    //
+    if(t->state == RUNNABLE && t != oldThread) {
+      //take better priority first
+      if(t->priority > bestPriority){
+        bestThread = t;
+        bestThreadPid = t->tid;
+        bestRound = t->mylastRound;
+        bestPriority = t->priority;
+      }
+      // take same priority if it suspend for longer time
+      else if(t->priority == bestPriority){
+        if(bestRound > t->mylastRound){
+          bestThread = t;
+          bestThreadPid = t->tid;
+          bestRound = t->mylastRound;
+          bestPriority = t->priority;
+        }
+      }
+    }
+  }
+
+  if(livingProcessCount == 1){
+    bestThread = oldThread;
+  }
+
+  bestThread->mylastRound = globalRound;
+  bestThread->state = RUNNING;
+  curThread = bestThread;
+  uswtch(&oldThread->context, &bestThread->context);
+
+}
+
+struct uthread* uthread_self(){
+  return curThread;
+}
+
+// set new priority to cur_thread and return the old one
+enum sched_priority uthread_set_priority(enum sched_priority priority){
+  struct uthread *t = curThread;
+  enum sched_priority old_p = t->priority;
+  t->priority = priority;
+  return old_p;
+}
+
+enum sched_priority uthread_get_priority(){
+  return curThread->priority;
+}; 
+
