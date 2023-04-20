@@ -78,14 +78,12 @@ void uthread_yield(){
   struct uthread *oldThread = uthread_self();
   struct uthread *bestThread = uthreadList;
   int bestPriority = -1;
-  int bestThreadPid = 0;
   long long bestRound = 0;
   int livingProcessCount = 0;
   globalRound++;
   oldThread->state = RUNNABLE;
 
   if(bestThread->state == RUNNABLE){
-    bestThreadPid = bestThread->tid;
     bestRound = bestThread->mylastRound;
     bestPriority = bestThread->priority;
   }
@@ -99,7 +97,6 @@ void uthread_yield(){
       //take better priority first
       if(t->priority > bestPriority){
         bestThread = t;
-        bestThreadPid = t->tid;
         bestRound = t->mylastRound;
         bestPriority = t->priority;
       }
@@ -107,7 +104,6 @@ void uthread_yield(){
       else if(t->priority == bestPriority){
         if(bestRound > t->mylastRound){
           bestThread = t;
-          bestThreadPid = t->tid;
           bestRound = t->mylastRound;
           bestPriority = t->priority;
         }

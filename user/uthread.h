@@ -33,7 +33,7 @@ struct uthread {
     struct context      context;        // uswtch() here to run process
     enum sched_priority priority;       // scheduling priority
     int tid;                            // Thread ID
-    long long mylastRound               // last time uthread Run
+    long long mylastRound;               // last time uthread Run
 };
 
 extern void uswtch(struct context*, struct context*);
