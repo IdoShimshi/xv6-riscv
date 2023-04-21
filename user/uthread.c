@@ -16,27 +16,26 @@ void thread_start(void (*start_func)()) {
 
 struct uthread* findByPolicy(){
   struct uthread *t;
-  struct uthread *oldThread = uthread_self();
-  struct uthread *bestThread = uthreadList;
+  struct uthread *bestThread = 0;
   int bestPriority = -1;
   long long bestRound = 0;
-  int livingProcessCount = 0;
+  // int livingProcessCount = 0;
   globalRound++;
-  oldThread->state = RUNNABLE;
 
-  if(bestThread->state == RUNNABLE){
-    bestRound = bestThread->mylastRound;
-    bestPriority = bestThread->priority;
-  }
+  // if(bestThread->state == RUNNABLE){
+  //   bestRound = bestThread->mylastRound;
+  //   bestPriority = bestThread->priority;
+  // }
   // policy= pick the best thread to run
   for(t = uthreadList; t < &uthreadList[MAX_UTHREADS]; t++) {
+    printf("thread %d has state %d, prio %d and round %d\n",t->tid,t->state,t->priority,t->mylastRound);
     // count living threads
-    if(t->state != FREE)
-      livingProcessCount++;
+    // if(t->state != FREE)
+    //   livingProcessCount++;
     //
-    if(t->state == RUNNABLE && t != oldThread) {
+    if(t->state == RUNNABLE) {
       //take better priority first
-      if(t->priority > bestPriority){
+      if(bestThread == 0 || t->priority > bestPriority){
         bestThread = t;
         bestRound = t->mylastRound;
         bestPriority = t->priority;
@@ -52,16 +51,11 @@ struct uthread* findByPolicy(){
     }
   }
 
-  if(livingProcessCount == 1){
-    bestThread = oldThread;
-  }
-
   bestThread->mylastRound = globalRound;
-    printf("policy just picked %d (state %d)as best-first thread to run\n",bestThread->tid,bestThread->state);
-
-  bestThread->state = RUNNING;
-  curThread = bestThread;
-
+  printf("policy just picked %d (state %d)as best-first thread to run\n",bestThread->tid,bestThread->state);
+  // curThread = bestThread;
+  // bestThread->state = RUNNING;
+  
   return bestThread;
 }
 
@@ -97,11 +91,12 @@ found:
 
     t->tid = nexttid++;
     t->priority = priority;
+    t->mylastRound = 0;
 
     t->context.sp = (uint64) t->ustack + STACK_SIZE; // set stack pointer to top of stack
-    t->context.ra = (uint64) thread_start; // set return address to starting function
+    t->context.ra = (uint64) start_func; // set return address to starting function
 
-    *((void (**)(void)) (t->context.sp - 8)) = start_func;
+    // *((void (**)(void)) (t->context.sp - 8)) = start_func;
 
     t->state = RUNNABLE;
     return 0;
@@ -120,23 +115,35 @@ int uthread_start_all(){
     
     if (first) {
         struct uthread *t = findByPolicy();
-        printf("before first exec\n\n");
-        uswtch(&t->context,&t->context);
-        void (*func_ptr)(void) = (void (*)(void)) t->context.ra;
-        func_ptr();
-        printf("after First exec his func\n");
+        curThread = t;
+        t->state = RUNNING;
+        struct context tempC;
+        uswtch(&tempC,&t->context);
+        // printf("before first exec\n");
+        // void (*func_ptr)(void) = (void (*)(void)) t->context.ra;
+        // func_ptr();
+        // printf("after First exec his func\n");
         return 0;
     }
     return -1;
 }
 
 void uthread_yield(){
-  printf("Starting yield\n");
+  // printf("Starting yield\n");
   struct uthread *oldThread = uthread_self();
+  if (oldThread->state == RUNNING)
+    oldThread->state = RUNNABLE;
   struct uthread *bestThread = findByPolicy();
-  printf("Before swtch: old one is %d best one is %d\n",oldThread->tid,bestThread->tid);
-  uswtch(&bestThread->context, &oldThread->context);
-  printf("After: FUCK DA SYSTEM, old context%d \n", oldThread->context);
+  if (bestThread == 0)
+  {
+    exit(0);
+  }
+  
+  bestThread->state = RUNNING;
+  curThread = bestThread;
+  // printf("Before swtch: old one is %d best one is %d\n",oldThread->tid,bestThread->tid);
+  uswtch(&oldThread->context, &bestThread->context);
+  // printf("After: FUCK DA SYSTEM, old context%d \n", oldThread->context);
 }
 
 
