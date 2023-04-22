@@ -7,20 +7,19 @@
 void printer1(void){
     printf("Hello 1\n");
     uthread_yield();
-    printf("World 1\n ");
+    printf("World 1\n");
     uthread_exit();
 }
 void printer2(void){
     printf("Hello 2\n");
     uthread_yield();
-    printf("World 2\n ");
-    uthread_exit();
+    printf("World 2\n");
+    return ;
 }
 void printer3(void){
     printf("Hello 3\n");
     uthread_yield();
-    printf("World 3\n ");
-    uthread_exit();
+    printf("World 3\n");
 }
 
 int

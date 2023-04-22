@@ -9,8 +9,8 @@ int nexttid = 1;
 long long globalRound = 0;
 
 
-void thread_start(void (*start_func)()) {
-  start_func();
+void thread_start() {
+  uthread_self()->start_func();
   uthread_exit();
 }
 
@@ -19,20 +19,9 @@ struct uthread* findByPolicy(){
   struct uthread *bestThread = 0;
   int bestPriority = -1;
   long long bestRound = 0;
-  // int livingProcessCount = 0;
   globalRound++;
 
-  // if(bestThread->state == RUNNABLE){
-  //   bestRound = bestThread->mylastRound;
-  //   bestPriority = bestThread->priority;
-  // }
-  // policy= pick the best thread to run
   for(t = uthreadList; t < &uthreadList[MAX_UTHREADS]; t++) {
-    printf("thread %d has state %d, prio %d and round %d\n",t->tid,t->state,t->priority,t->mylastRound);
-    // count living threads
-    // if(t->state != FREE)
-    //   livingProcessCount++;
-    //
     if(t->state == RUNNABLE) {
       //take better priority first
       if(bestThread == 0 || t->priority > bestPriority){
@@ -52,9 +41,6 @@ struct uthread* findByPolicy(){
   }
 
   bestThread->mylastRound = globalRound;
-  printf("policy just picked %d (state %d)as best-first thread to run\n",bestThread->tid,bestThread->state);
-  // curThread = bestThread;
-  // bestThread->state = RUNNING;
   
   return bestThread;
 }
@@ -65,15 +51,12 @@ uthreadinit(void)
   struct uthread *t;
 //   initialize locks if needed
   for(t = uthreadList; t < &uthreadList[MAX_UTHREADS]; t++) {
-    //   initlock(&p->lock, "proc");
       t->state = FREE;
-    //   p->kstack = KSTACK((int) (p - proc));
   }
 }
 
 
 int uthread_create(void (*start_func)(), enum sched_priority priority){
-  printf("create 1\n");
   if(creationStatus==0){
     uthreadinit();
     creationStatus = 1;
@@ -94,9 +77,9 @@ found:
     t->mylastRound = 0;
 
     t->context.sp = (uint64) t->ustack + STACK_SIZE; // set stack pointer to top of stack
-    t->context.ra = (uint64) start_func; // set return address to starting function
-
-    // *((void (**)(void)) (t->context.sp - 8)) = start_func;
+    t->context.ra = (uint64) thread_start; // set return address to starting function
+    t->start_func = start_func;
+    // *((void (**)(void)) (t->context.sp - 8)) = uthread_exit;
 
     t->state = RUNNABLE;
     return 0;
@@ -119,17 +102,13 @@ int uthread_start_all(){
         t->state = RUNNING;
         struct context tempC;
         uswtch(&tempC,&t->context);
-        // printf("before first exec\n");
-        // void (*func_ptr)(void) = (void (*)(void)) t->context.ra;
-        // func_ptr();
-        // printf("after First exec his func\n");
+        printf("SHOULD NOT BE HERE");
         return 0;
     }
     return -1;
 }
 
 void uthread_yield(){
-  // printf("Starting yield\n");
   struct uthread *oldThread = uthread_self();
   if (oldThread->state == RUNNING)
     oldThread->state = RUNNABLE;
@@ -141,9 +120,7 @@ void uthread_yield(){
   
   bestThread->state = RUNNING;
   curThread = bestThread;
-  // printf("Before swtch: old one is %d best one is %d\n",oldThread->tid,bestThread->tid);
   uswtch(&oldThread->context, &bestThread->context);
-  // printf("After: FUCK DA SYSTEM, old context%d \n", oldThread->context);
 }
 
 
