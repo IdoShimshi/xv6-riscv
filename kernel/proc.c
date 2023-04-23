@@ -164,7 +164,16 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  if(p->base_trapframes)
+  if(p==0)
+    return;
+    
+  struct kthread *k;
+  // free each thread in kthread list of the process  
+  for(k = p->kthread; k < &p->kthread[NKT]; k++){
+    // inside freekthread lock is acquire 
+    freekthread(k);
+  }
+  if(p->base_trapframes)  
     kfree((void*)p->base_trapframes);
   p->base_trapframes = 0;
   if(p->pagetable)
@@ -177,7 +186,9 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
-  p->state = UNUSED;
+  p->state = P_UNUSED;
+  p->threadsCounter=0; 
+  
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -388,7 +399,17 @@ exit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
-  p->state = ZOMBIE;
+  p->state =P_ZOMBIE;
+
+  struct kthread *k;
+  // make all process threads Zombies (for exit proposes)
+  for(k = p->kthread; k < &p->kthread[NKT]; k++){
+    if(k != 0){
+      acquire(&k->lock);
+      k->state = T_ZOMBIE;
+      release(&k->lock);
+    }
+  }
 
   release(&wait_lock);
 
