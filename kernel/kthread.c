@@ -8,6 +8,31 @@
 
 extern struct proc proc[NPROC];
 
+struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
+{
+  return p->base_trapframes + ((int)(kt - p->kthread));
+}
+
+// A fork child's very first scheduling by scheduler()
+// will swtch to forkret.
+void forkret(void)
+{
+  static int first = 1;
+
+  // Still holding p->lock from scheduler.
+  release(&myproc()->lock);
+
+  if (first) {
+    // File system initialization must be run in the context of a
+    // regular process (e.g., because it calls sleep), and thus cannot
+    // be run from main().
+    first = 0;
+    fsinit(ROOTDEV);
+  }
+
+  usertrapret();
+}
+
 void kthreadinit(struct proc *p)
 {
   initlock(&p->counterLock, "nexttid");
@@ -69,30 +94,8 @@ found:
   return kt;
 }
 
-// A fork child's very first scheduling by scheduler()
-// will swtch to forkret.
-void
-forkret(void)
-{
-  static int first = 1;
 
-  // Still holding p->lock from scheduler.
-  release(&myproc()->lock);
 
-  if (first) {
-    // File system initialization must be run in the context of a
-    // regular process (e.g., because it calls sleep), and thus cannot
-    // be run from main().
-    first = 0;
-    fsinit(ROOTDEV);
-  }
-
-  usertrapret();
-}
-struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
-{
-  return p->base_trapframes + ((int)(kt - p->kthread));
-}
 
 // TODO: delte this after you are done with task 2.2
 // void allocproc_help_function(struct proc *p) {

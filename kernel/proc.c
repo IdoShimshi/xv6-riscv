@@ -128,7 +128,7 @@ found:
   p->pid = allocpid();
   p->state = P_USED;
   p->threadsCounter = 1;
-  struct kthread* kt =  allocthread(p);
+  allocthread(p);
 
   // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
@@ -183,7 +183,6 @@ freeproc(struct proc *p)
   p->pid = 0;
   p->parent = 0;
   p->name[0] = 0;
-  p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
   p->state = P_UNUSED;
@@ -552,27 +551,6 @@ yield(void)
   kt->state = T_RUNNABLE;
   sched();
   release(&kt->lock);
-}
-
-// A fork child's very first scheduling by scheduler()
-// will swtch to forkret.
-void
-forkret(void)
-{
-  static int first = 1;
-
-  // Still holding p->lock from scheduler.
-  release(&myproc()->lock);
-
-  if (first) {
-    // File system initialization must be run in the context of a
-    // regular process (e.g., because it calls sleep), and thus cannot
-    // be run from main().
-    first = 0;
-    fsinit(ROOTDEV);
-  }
-
-  usertrapret();
 }
 
 // Atomically release lock and sleep on chan.
