@@ -27,7 +27,7 @@ main(int argc, char *argv[])
 {
   uthread_create(printer1,LOW);
   uthread_create(printer2,LOW);
-  uthread_create(printer3,LOW);
+  uthread_create(printer3,HIGH);
 
   uthread_start_all();
   exit(0);
