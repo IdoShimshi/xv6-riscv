@@ -96,7 +96,6 @@ found:
 
 
 
-
 // TODO: delte this after you are done with task 2.2
 // void allocproc_help_function(struct proc *p) {
 //   p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);

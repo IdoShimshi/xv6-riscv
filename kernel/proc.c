@@ -127,8 +127,6 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = P_USED;
-  p->threadsCounter = 1;
-  allocthread(p);
 
   // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
@@ -136,6 +134,11 @@ found:
     release(&p->lock);
     return 0;
   }
+  
+  acquire(&p->counterLock);
+  p->threadsCounter = 1;
+  release(&p->counterLock);
+  allocthread(p);
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -386,7 +389,7 @@ exit(int status)
   iput(p->cwd);
   end_op();
   p->cwd = 0;
-
+  
   acquire(&wait_lock);
 
   // Give any children to init.
@@ -489,13 +492,17 @@ scheduler(void)
       acquire(&p->lock);
       if(p->state == P_USED) {
         for(kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
+          printf("gothere %d, my cpu: %p\n",(kt->parent->kthread - kt)/sizeof(kt), mycpu());
           acquire(&kt->lock);
+          printf("gothere %d, my cpu: %p\n",(kt->parent->kthread - kt)/sizeof(kt), mycpu());
           if (kt->state == T_RUNNABLE){
+             printf("gothere 2\n");
             // Switch to chosen process.  It is the process's job
             // to release its lock and then reacquire it
             // before jumping back to us.
             kt->state = T_RUNNING;
             c->kt = kt;
+            
             swtch(&c->context, &kt->context);
 
             // Process is done running for now.
@@ -552,6 +559,7 @@ yield(void)
   sched();
   release(&kt->lock);
 }
+
 
 // Atomically release lock and sleep on chan.
 // Reacquires lock when awakened.
