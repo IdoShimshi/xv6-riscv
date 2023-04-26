@@ -134,11 +134,6 @@ found:
     release(&p->lock);
     return 0;
   }
-  
-  acquire(&p->counterLock);
-  p->threadsCounter = 1;
-  release(&p->counterLock);
-  allocthread(p);
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -148,7 +143,10 @@ found:
     return 0;
   }
 
-
+  acquire(&p->counterLock);
+  p->threadsCounter = 1;
+  release(&p->counterLock);
+  allocthread(p);
   // Set up new context to start executing at forkret,
   // which returns to user space.
   // memset(&p->context, 0, sizeof(p->context));
@@ -272,7 +270,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->kthread[0].state = T_RUNNABLE;
-  release(&p->kthread[0].lock);
+  release(&(p->kthread[0].lock));
 
   release(&p->lock);
 }
@@ -489,14 +487,16 @@ scheduler(void)
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
+      printf("cpu %p acquiring pid: %d \n", mycpu(),p->pid);
       acquire(&p->lock);
+      printf("cpu %p acquired pid: %d \n", mycpu(), p->pid);
       if(p->state == P_USED) {
         for(kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
-          printf("gothere %d, my cpu: %p\n",(kt->parent->kthread - kt)/sizeof(kt), mycpu());
+          printf("cpu %p acquiring tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
           acquire(&kt->lock);
-          printf("gothere %d, my cpu: %p\n",(kt->parent->kthread - kt)/sizeof(kt), mycpu());
+          printf("cpu %p acquired tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
           if (kt->state == T_RUNNABLE){
-             printf("gothere 2\n");
+            //  printf("gothere 2\n");
             // Switch to chosen process.  It is the process's job
             // to release its lock and then reacquire it
             // before jumping back to us.
@@ -509,10 +509,14 @@ scheduler(void)
             // It should have changed its p->state before coming back.
             c->kt = 0;
           }
+          printf("cpu %p releasing tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
           release(&kt->lock);
+          printf("cpu %p released tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
         }
       }
+      printf("cpu %p releasing pid: %d \n", mycpu(), p->pid);
       release(&p->lock);
+      printf("cpu %p released pid: %d \n", mycpu(),p->pid);
     }
   }
 }
@@ -554,10 +558,12 @@ void
 yield(void)
 {
   struct kthread *kt = mykthread();
+  acquire(&kt->parent->lock);
   acquire(&kt->lock);
   kt->state = T_RUNNABLE;
   sched();
   release(&kt->lock);
+  release(&kt->parent->lock);
 }
 
 
@@ -574,8 +580,11 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-
+printf("gothere\n");
+  acquire(&kt->parent->lock);
+  printf("gothere\n");
   acquire(&kt->lock);  //DOC: sleeplock1
+  printf("gothere\n");
   release(lk);
 
   // Go to sleep.
@@ -589,6 +598,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Reacquire original lock.
   release(&kt->lock);
+  release(&kt->parent->lock);
   acquire(lk);
 }
 
