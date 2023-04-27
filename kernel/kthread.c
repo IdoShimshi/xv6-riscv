@@ -20,7 +20,8 @@ void forkret(void)
   static int first = 1;
 
   // Still holding p->lock from scheduler.
-  release(&myproc()->lock);
+  
+  release(&mykthread()->lock);
 
   if (first) {
     // File system initialization must be run in the context of a

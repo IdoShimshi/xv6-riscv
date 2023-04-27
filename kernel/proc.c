@@ -146,16 +146,9 @@ found:
   acquire(&p->counterLock);
   p->threadsCounter = 1;
   release(&p->counterLock);
+  release(&p->lock);
   allocthread(p);
-  // Set up new context to start executing at forkret,
-  // which returns to user space.
-  // memset(&p->context, 0, sizeof(p->context));
-  // p->context.ra = (uint64)forkret;
-  // p->context.sp = p->kstack + PGSIZE;
 
-
-  // TODO: delte this after you are done with task 2.2
-  // allocproc_help_function(p);
   return p;
 }
 
@@ -272,7 +265,6 @@ userinit(void)
   p->kthread[0].state = T_RUNNABLE;
   release(&(p->kthread[0].lock));
 
-  release(&p->lock);
 }
 
 // Grow or shrink user memory by n bytes.
@@ -309,7 +301,6 @@ fork(void)
   if((np = allocproc()) == 0){
     return -1;
   }
-
   // Copy user memory from parent to child.
   if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
@@ -335,7 +326,6 @@ fork(void)
   pid = np->pid;
 
   release(&np->kthread[0].lock);
-  release(&np->lock);
 
   acquire(&wait_lock);
   np->parent = p;
@@ -400,6 +390,7 @@ exit(int status)
 
   p->xstate = status;
   p->state =P_ZOMBIE;
+  release(&p->lock);
 
   struct kthread *k;
   // make all process threads Zombies (for exit proposes)
@@ -410,7 +401,7 @@ exit(int status)
       release(&k->lock);
     }
   }
-
+  acquire(&mykthread()->lock);
   release(&wait_lock);
 
   // Jump into the scheduler, never to return.
@@ -487,36 +478,24 @@ scheduler(void)
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
-      printf("cpu %p acquiring pid: %d \n", mycpu(),p->pid);
-      acquire(&p->lock);
-      printf("cpu %p acquired pid: %d \n", mycpu(), p->pid);
       if(p->state == P_USED) {
         for(kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
-          printf("cpu %p acquiring tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
           acquire(&kt->lock);
-          printf("cpu %p acquired tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
           if (kt->state == T_RUNNABLE){
-            //  printf("gothere 2\n");
             // Switch to chosen process.  It is the process's job
             // to release its lock and then reacquire it
             // before jumping back to us.
             kt->state = T_RUNNING;
             c->kt = kt;
-            
             swtch(&c->context, &kt->context);
 
             // Process is done running for now.
             // It should have changed its p->state before coming back.
             c->kt = 0;
           }
-          printf("cpu %p releasing tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
           release(&kt->lock);
-          printf("cpu %p released tid:%d of pid: %d \n", mycpu(), kt->tid,p->pid);
         }
       }
-      printf("cpu %p releasing pid: %d \n", mycpu(), p->pid);
-      release(&p->lock);
-      printf("cpu %p released pid: %d \n", mycpu(),p->pid);
     }
   }
 }
@@ -532,11 +511,8 @@ void
 sched(void)
 {
   int intena;
-  struct proc *p = myproc();
   struct kthread *kt = mykthread();
 
-  if(!holding(&p->lock))
-    panic("sched p->lock");
   if(!holding(&kt->lock))
   panic("sched kt->lock");
 
@@ -558,12 +534,10 @@ void
 yield(void)
 {
   struct kthread *kt = mykthread();
-  acquire(&kt->parent->lock);
   acquire(&kt->lock);
   kt->state = T_RUNNABLE;
   sched();
   release(&kt->lock);
-  release(&kt->parent->lock);
 }
 
 
@@ -580,11 +554,8 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup locks p->lock),
   // so it's okay to release lk.
-printf("gothere\n");
-  acquire(&kt->parent->lock);
-  printf("gothere\n");
+
   acquire(&kt->lock);  //DOC: sleeplock1
-  printf("gothere\n");
   release(lk);
 
   // Go to sleep.
@@ -598,7 +569,7 @@ printf("gothere\n");
 
   // Reacquire original lock.
   release(&kt->lock);
-  release(&kt->parent->lock);
+  // release(&kt->parent->lock);
   acquire(lk);
 }
 
@@ -611,7 +582,6 @@ wakeup(void *chan)
   struct kthread *kt;
 
   for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
       if(p->state == P_USED) {
         for(kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
           acquire(&kt->lock);
@@ -621,7 +591,6 @@ wakeup(void *chan)
           release(&kt->lock);
         }
       }
-      release(&p->lock);
     }
 }
 
@@ -640,6 +609,7 @@ kill(int pid)
       p->killed = 1;
       for(kt = p->kthread; kt < &p->kthread[NKT]; kt++) {
         acquire(&kt->lock);
+        kt->killed = 1;
         if(kt->state == T_SLEEPING){
         // Wake process from sleep().
         kt->state = T_RUNNABLE;
