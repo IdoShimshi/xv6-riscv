@@ -95,7 +95,6 @@ found:
   return kt;
 }
 
-
 void freekthread(struct kthread* k){
   if (k == 0)
       return;
@@ -108,5 +107,20 @@ void freekthread(struct kthread* k){
   k->xstate = 0;
   k->tid = 0;
   release(&k->lock);
+}
 
+int kthread_create(void *(*start_func)(), void *stack, uint stack_size){
+  return 0;
+}
+int kthread_id(){
+  return 0;
+}
+int kthread_kill(int ktid){
+  return 0;
+}
+void kthread_exit(int status){
+  return;
+}
+int kthread_join(int ktid, int *status){
+  return 0;
 }
