@@ -160,7 +160,7 @@ freeproc(struct proc *p)
 {
   if(p==0)
     return;
-    
+
   struct kthread *k;
   // free each thread in kthread list of the process  
   for(k = p->kthread; k < &p->kthread[NKT]; k++){
@@ -180,7 +180,6 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = P_UNUSED;
-  p->threadsCounter=0; 
   
 }
 
@@ -386,12 +385,6 @@ exit(int status)
   // Parent might be sleeping in wait().
   wakeup(p->parent);
   
-  acquire(&p->lock);
-
-  p->xstate = status;
-  p->state =P_ZOMBIE;
-  release(&p->lock);
-
   struct kthread *k;
   // make all process threads Zombies (for exit proposes)
   for(k = p->kthread; k < &p->kthread[NKT]; k++){
@@ -401,6 +394,13 @@ exit(int status)
       release(&k->lock);
     }
   }
+
+  acquire(&p->lock);
+  p->xstate = status;
+  p->state = P_ZOMBIE;
+  release(&p->lock);
+
+  
   acquire(&mykthread()->lock);
   release(&wait_lock);
 

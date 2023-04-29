@@ -96,29 +96,17 @@ found:
 }
 
 
-
-// TODO: delte this after you are done with task 2.2
-// void allocproc_help_function(struct proc *p) {
-//   p->kthread->trapframe = get_kthread_trapframe(p, p->kthread);
-
-//   p->context.sp = p->kthread->kstack + PGSIZE;
-// }
-
 void freekthread(struct kthread* k){
   if (k == 0)
       return;
       
   acquire(&k->lock);
-  if(k->trapframe)
-  // kfree is the same func that clean trapframe in freePROC
-  // hope it'll work for cleaning thread trapframme
-    kfree((void*)k->trapframe);
   k->trapframe = 0;
   k->state = T_UNUSED;
   k->chan = 0;
   k->killed = 0;
   k->xstate = 0;
-  k->parent = 0;
-  k->trapframe = 0; 
+  k->tid = 0;
   release(&k->lock);
+
 }
