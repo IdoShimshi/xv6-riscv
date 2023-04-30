@@ -71,6 +71,7 @@ int alloctid(struct proc *p)
   return tid;
 }
 
+
 struct kthread* allocthread(struct proc *p){
   struct kthread *kt;
 
@@ -109,9 +110,30 @@ void freekthread(struct kthread* k){
   release(&k->lock);
 }
 
+// find UNUSED thread under the calling process
+// init some of this thread fields
+// return tid or -1 if no UNUSED thread found
 int kthread_create(void *(*start_func)(), void *stack, uint stack_size){
-  return 0;
+struct proc* p = myproc();
+struct kthread *kt = allocthread(p);
+// no thread was initialized
+if(kt == 0)
+  return -1;
+
+// if we here, let's set thread relevant fields
+acquire(&kt->lock);
+kt->state = T_RUNNABLE;
+kt->kstack = (uint64)stack;
+//set epc register for func starting point
+kt->trapframe->epc = (uint64)start_func;
+// " and the user-space ‘sp’ register to the top of the stack."
+// 1. there's also sp register in the context of thread. consider this sp also
+// 2. top of stack? hope it's stack + size
+kt->trapframe->sp = (uint64)stack+(uint64)stack_size;
+release(&kt->lock);
+  return kt->tid;
 }
+
 int kthread_id(){
   return 0;
 }
