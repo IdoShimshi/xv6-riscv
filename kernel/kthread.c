@@ -126,17 +126,15 @@ if(kt == 0)
   return -1;
 
 // if we here, let's set thread relevant fields
-acquire(&kt->lock);
-kt->state = T_RUNNABLE;
-kt->kstack = (uint64)stack;
 //set epc register for func starting point
 kt->trapframe->epc = (uint64)start_func;
 // " and the user-space ‘sp’ register to the top of the stack."
 // 1. there's also sp register in the context of thread. consider this sp also
 // 2. top of stack? hope it's stack + size
-kt->trapframe->sp = (uint64)stack+(uint64)stack_size;
+kt->trapframe->sp = (uint64)stack + stack_size;
+kt->state = T_RUNNABLE;
 release(&kt->lock);
-  return kt->tid;
+return kt->tid;
 }
 
 int kthread_kill(int ktid){
@@ -160,21 +158,24 @@ int kthread_kill(int ktid){
 }
 
 void kthread_exit(int status){
-  struct kthread *kt = mykthread();
+  struct proc *p = myproc();
+  struct kthread *kt;
 
   int alive_threads = 0;
-  for(kt = kt->parent->kthread; kt < &kt->parent->kthread[NKT]; kt++){
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
     acquire(&kt->lock);
     if (kt->state != T_UNUSED && kt->state != T_ZOMBIE)
       alive_threads++;
     release(&kt->lock);
   }
-  if (alive_threads > 1){
+  if (alive_threads <= 1){
     exit(status);
   }
+  kt = mykthread();
+  
   acquire(&kthread_wait_lock);
   wakeup(kt);
-
+  
   acquire(&kt->lock);
   kt->xstate = status;
   kt->state = T_ZOMBIE;
@@ -182,7 +183,7 @@ void kthread_exit(int status){
   release(&kthread_wait_lock);
 
   acquire(&kt->lock);
-
+  
   // Jump into the scheduler, never to return.
   sched();
   panic("thread zombie exit");
@@ -195,19 +196,21 @@ int kthread_join(int ktid, int *status){
   for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
     if(kt->tid == ktid){
       for(;;){
-        if (kt->state != T_ZOMBIE){
+        if (kt->state == T_ZOMBIE){
           acquire(&kt->lock);
+
           if(status != 0 && copyout(kt->parent->pagetable, (uint64) status, (char *)&kt->xstate,
                                       sizeof(kt->xstate)) < 0) {
             release(&kt->lock);
             release(&kthread_wait_lock);
             return -1;
           }
-          freekthread(kt);
           release(&kt->lock);
+          freekthread(kt);
           release(&kthread_wait_lock);
           return 0;
         }
+        
         sleep(kt,&kthread_wait_lock);
       }
     }
