@@ -1,5 +1,5 @@
 struct stat;
-
+#define MAX_STACK_SIZE 4000
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
