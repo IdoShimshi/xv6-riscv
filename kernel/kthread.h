@@ -97,3 +97,9 @@ struct kthread
   struct trapframe *trapframe;  // data page for trampoline.S
   struct context context;      // swtch() here to run thread
 };
+
+// helps ensure that wakeups of wait()ing
+// parents are not lost. helps obey the
+// memory model when using p->parent.
+// must be acquired before any p->lock.
+struct spinlock wait_lock;

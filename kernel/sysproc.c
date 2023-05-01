@@ -106,7 +106,7 @@ sys_kthread_create(void)
 uint64
 sys_kthread_id(void)
 {
-  return kthread_id(); 
+  return mykthread()->tid; 
 }
 
 uint64

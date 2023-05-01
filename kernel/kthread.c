@@ -8,6 +8,7 @@
 
 extern struct proc proc[NPROC];
 
+
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
   return p->base_trapframes + ((int)(kt - p->kthread));
@@ -134,15 +135,78 @@ release(&kt->lock);
   return kt->tid;
 }
 
-int kthread_id(){
-  return 0;
-}
 int kthread_kill(int ktid){
-  return 0;
+  struct proc *p = myproc();
+  struct kthread *kt;
+
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
+    acquire(&kt->lock);
+    if(kt->tid == ktid){
+      kt->killed = 1;
+      if(kt->state == T_SLEEPING){
+      // Wake thread from sleep().
+      kt->state = T_RUNNABLE;
+      }
+      release(&kt->lock);
+      return 0;
+    }
+    release(&kt->lock);
+  }
+  return -1;
 }
+
 void kthread_exit(int status){
-  return;
+  struct kthread *kt = mykthread();
+
+  int alive_threads = 0;
+  for(kt = kt->parent->kthread; kt < &kt->parent->kthread[NKT]; kt++){
+    acquire(&kt->lock);
+    if (kt->state != T_UNUSED && kt->state != T_ZOMBIE)
+      alive_threads++;
+    release(&kt->lock);
+  }
+  if (alive_threads > 1){
+    exit(status);
+  }
+  acquire(&wait_lock);
+  acquire(&kt->lock);
+  kt->xstate = status;
+  kt->state = T_ZOMBIE;
+  release(&kt->lock);
+
+  wakeup(kt);
+  release(&wait_lock);
+
+  acquire(&kt->lock);
+
+  // Jump into the scheduler, never to return.
+  sched();
+  panic("thread zombie exit");
 }
+
 int kthread_join(int ktid, int *status){
-  return 0;
+  struct kthread *kt;
+  acquire(&wait_lock);
+  for(kt = kt->parent->kthread; kt < &kt->parent->kthread[NKT]; kt++){
+    if(kt->tid == ktid){
+      for(;;){
+        if (kt->state != T_ZOMBIE){
+          acquire(&kt->lock);
+          if(status != 0 && copyout(kt->parent->pagetable, status, (char *)&kt->xstate,
+                                      sizeof(kt->xstate)) < 0) {
+            release(&kt->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          freekthread(kt);
+          release(&kt->lock);
+          release(&wait_lock);
+          return 0;
+        }
+        sleep(kt,&wait_lock);
+      }
+    }
+  }
+  release(&wait_lock);
+  return -1;
 }
