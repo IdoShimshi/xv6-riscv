@@ -8,7 +8,11 @@
 
 extern struct proc proc[NPROC];
 
-
+// helps ensure that wakeups of wait()ing
+// parents are not lost. helps obey the
+// memory model when using p->parent.
+// must be acquired before any p->lock.
+struct spinlock kthread_wait_lock;
 struct trapframe *get_kthread_trapframe(struct proc *p, struct kthread *kt)
 {
   return p->base_trapframes + ((int)(kt - p->kthread));
@@ -168,14 +172,14 @@ void kthread_exit(int status){
   if (alive_threads > 1){
     exit(status);
   }
-  acquire(&wait_lock);
+  acquire(&kthread_wait_lock);
+  wakeup(kt);
+
   acquire(&kt->lock);
   kt->xstate = status;
   kt->state = T_ZOMBIE;
   release(&kt->lock);
-
-  wakeup(kt);
-  release(&wait_lock);
+  release(&kthread_wait_lock);
 
   acquire(&kt->lock);
 
@@ -185,28 +189,40 @@ void kthread_exit(int status){
 }
 
 int kthread_join(int ktid, int *status){
+  struct proc *p = myproc();
   struct kthread *kt;
-  acquire(&wait_lock);
-  for(kt = kt->parent->kthread; kt < &kt->parent->kthread[NKT]; kt++){
+  acquire(&kthread_wait_lock);
+  for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
     if(kt->tid == ktid){
       for(;;){
         if (kt->state != T_ZOMBIE){
           acquire(&kt->lock);
-          if(status != 0 && copyout(kt->parent->pagetable, status, (char *)&kt->xstate,
+          if(status != 0 && copyout(kt->parent->pagetable, (uint64) status, (char *)&kt->xstate,
                                       sizeof(kt->xstate)) < 0) {
             release(&kt->lock);
-            release(&wait_lock);
+            release(&kthread_wait_lock);
             return -1;
           }
           freekthread(kt);
           release(&kt->lock);
-          release(&wait_lock);
+          release(&kthread_wait_lock);
           return 0;
         }
-        sleep(kt,&wait_lock);
+        sleep(kt,&kthread_wait_lock);
       }
     }
   }
-  release(&wait_lock);
+  release(&kthread_wait_lock);
   return -1;
+}
+
+int
+kthread_killed(struct kthread *kt)
+{
+  int k;
+
+  acquire(&kt->lock);
+  k = kt->killed;
+  release(&kt->lock);
+  return k;
 }

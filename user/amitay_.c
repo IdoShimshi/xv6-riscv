@@ -10,7 +10,8 @@ void *thread_func(void *arg) {
   // Print a message from the new thread
   printf("I'm the new thread created!\n");
   // Exit the new thread
-  kthread_exit();
+  kthread_exit(1);
+  return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -27,9 +28,9 @@ int main(int argc, char *argv[]) {
     printf("Failed to create new thread\n");
     exit(1);
   }
-
+  int status;
   // Wait for the new thread to exit
-  kthread_join(thread_id);
+  kthread_join(thread_id, &status);
 
   // Free the stack memory
   free(stack);

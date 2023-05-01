@@ -56,7 +56,7 @@ usertrap(void)
     if(killed(p))
       exit(-1);
 
-    if(thread_killed(kt))
+    if(kthread_killed(kt))
       kthread_exit(-1);
 
     // sepc points to the ecall instruction,
@@ -79,7 +79,7 @@ usertrap(void)
   if(killed(p))
     exit(-1);
 
-  if(thread_killed(kt))
+  if(kthread_killed(kt))
       kthread_exit(-1);
 
   // give up the CPU if this is a timer interrupt.
