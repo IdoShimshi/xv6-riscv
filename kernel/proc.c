@@ -358,10 +358,34 @@ reparent(struct proc *p)
 void
 exit(int status)
 {
+  int static first = 1;
+  acquire(&wait_lock); // before with was under p->cwd line
+  acquire(&myproc()->lock);
   struct proc *p = myproc();
+
 
   if(p == initproc)
     panic("init exiting");
+
+  // some other thread  called exit() already. 
+  if(first == 0){
+    return;
+  }
+  
+  // only first exit() call will enter her
+  first = 0;
+
+  struct kthread *k;
+  // make all process threads Zombies (for exit proposes)
+  for(k = p->kthread; k < &p->kthread[NKT]; k++){
+    if(k != 0 && k != mykthread()){
+      acquire(&k->lock);
+      k->state = T_ZOMBIE;
+      k->xstate = status;
+      release(&k->lock);
+    }
+  }
+
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -377,7 +401,6 @@ exit(int status)
   end_op();
   p->cwd = 0;
   
-  acquire(&wait_lock);
 
   // Give any children to init.
   reparent(p);
@@ -385,22 +408,21 @@ exit(int status)
   // Parent might be sleeping in wait().
   wakeup(p->parent);
   
-  struct kthread *k;
-  // make all process threads Zombies (for exit proposes)
-  for(k = p->kthread; k < &p->kthread[NKT]; k++){
-    if(k != 0){
-      acquire(&k->lock);
-      k->state = T_ZOMBIE;
-      release(&k->lock);
-    }
-  }
+  
 
-  acquire(&p->lock);
+  // kill my own process 
   p->xstate = status;
   p->state = P_ZOMBIE;
-  release(&p->lock);
+  // kill my own kthread
+  acquire(&mykthread()->lock);
+  mykthread()->state = T_ZOMBIE;
+  mykthread()->xstate = status;
 
   
+  release(&mykthread()->lock);
+  release(&p->lock);
+
+
   acquire(&mykthread()->lock);
   release(&wait_lock);
 

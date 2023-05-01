@@ -140,9 +140,23 @@ int kthread_id(){
 int kthread_kill(int ktid){
   return 0;
 }
-void kthread_exit(int status){
-  return;
+
+int
+kthread_killed(struct kthread *kt)
+{
+  int k;
+  
+  acquire(&kt->lock);
+  k = kt->killed;
+  release(&kt->lock);
+  return k;
 }
+
+void kthread_exit(int status){
+
+}
+
+
+
 int kthread_join(int ktid, int *status){
-  return 0;
 }
