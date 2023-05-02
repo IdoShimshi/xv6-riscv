@@ -20,7 +20,6 @@ struct uthread* findByPolicy(){
   int bestPriority = -1;
   long long bestRound = 0;
   globalRound++;
-
   for(t = uthreadList; t < &uthreadList[MAX_UTHREADS]; t++) {
     if(t->state == RUNNABLE) {
       //take better priority first
@@ -39,8 +38,8 @@ struct uthread* findByPolicy(){
       }
     }
   }
-
-  bestThread->mylastRound = globalRound;
+  if (bestThread != 0)
+    bestThread->mylastRound = globalRound;
   
   return bestThread;
 }
@@ -86,14 +85,12 @@ found:
 }
 // when creating a thread. i now want to free the used stack once the thread exits, how do i do that?
 void uthread_exit(){
-    struct uthread *myThread = uthread_self();
-    myThread->state = FREE;
-
+    struct uthread *t = uthread_self();
+    t->state = FREE;
     uthread_yield();
 }
 
 int uthread_start_all(){
-    printf("starting all\n");
     static int first = 1;
     
     if (first) {
@@ -114,10 +111,7 @@ void uthread_yield(){
     oldThread->state = RUNNABLE;
   struct uthread *bestThread = findByPolicy();
   if (bestThread == 0)
-  {
     exit(0);
-  }
-  
   bestThread->state = RUNNING;
   curThread = bestThread;
   uswtch(&oldThread->context, &bestThread->context);
