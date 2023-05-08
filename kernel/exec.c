@@ -111,11 +111,20 @@ exec(char *path, char **argv)
   if(copyout(pagetable, sp, (char *)ustack, (argc+1)*sizeof(uint64)) < 0)
     goto bad;
 
+  kt = mykthread();
+  acquire(&p->lock);
+  if (kt->state == T_UNUSED){
+    release(&p->lock);
+    acquire(&kt->lock);
+    sched();
+  }
+    
   for(kt = p->kthread; kt < &p->kthread[NKT]; kt++){
     if(kt->state != T_UNUSED && kt != mykthread()){
       freekthread(kt);
     }
   }
+  release(&p->lock);
 
   kt = mykthread();
   // arguments to user main(argc, argv)

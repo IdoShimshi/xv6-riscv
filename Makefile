@@ -135,6 +135,11 @@ UPROGS=\
 	$U/_zombie\
 	$U/_test_task1\
 	$U/_amitay_\
+	$U/_testkthreadcreate\
+	$U/_testkthreadexec\
+	$U/_testkthreadexit\
+	$U/_testkthreadfork\
+	$U/_testkthreadkilljoin\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
