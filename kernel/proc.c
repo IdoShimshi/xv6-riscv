@@ -127,6 +127,7 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = P_USED;
+  p->exiting = 0;
 
   // Allocate a trapframe page.
   if((p->base_trapframes = (struct trapframe *)kalloc()) == 0){
@@ -179,6 +180,7 @@ freeproc(struct proc *p)
   p->name[0] = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->exiting = 0;
   p->state = P_UNUSED;
   
 }
@@ -359,6 +361,30 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
+  struct kthread *k;
+  acquire(&p->lock);
+  if (!p->exiting)
+    p->exiting = 1;
+  else{
+    release(&p->lock);
+    kthread_exit(status);
+  }
+  release(&p->lock);
+
+  // exit all process
+  for(k = p->kthread; k < &p->kthread[NKT]; k++){
+    if(k->state != T_UNUSED && k != mykthread()){
+      acquire(&k->lock);
+      k->killed = 1;
+      if(k->state == T_SLEEPING){
+        // Wake process from sleep().
+        k->state = T_RUNNABLE;
+      }
+      release(&k->lock);
+      kthread_join(k->tid, 0);
+    }
+  }
+  
 
   if(p == initproc)
     panic("init exiting");
@@ -385,19 +411,14 @@ exit(int status)
   // Parent might be sleeping in wait().
   wakeup(p->parent);
   
-  struct kthread *k;
-  // make all process threads Zombies (for exit proposes)
-  for(k = p->kthread; k < &p->kthread[NKT]; k++){
-    if(k != 0){
-      acquire(&k->lock);
-      k->state = T_ZOMBIE;
-      release(&k->lock);
-    }
-  }
-
+  k = mykthread();
   acquire(&p->lock);
+  acquire(&k->lock);
   p->xstate = status;
+  k->xstate = status;
   p->state = P_ZOMBIE;
+  k->state = T_ZOMBIE;
+  release(&k->lock);
   release(&p->lock);
 
   

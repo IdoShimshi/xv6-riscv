@@ -46,14 +46,13 @@ int main(int argc,char** argv){
     Expected Behaviuor:\n\
     the child prints the lyrics of the song Perfect Day by Lou Reed and exit\n\n");
     fprintf(2,"father PID: %d\n",getpid());
-    // int status;
     void* stack = malloc(4000);
+    int thread_status;
     int tid;
     if((tid = kthread_create(thread,stack,4000)) == -1){
         fprintf(2,"[ERROR] couldn't start a thread\n");
         return 1;
     }
-    // kthread_join(tid, &status);
-    printf("father exiting\n");
+    kthread_join(tid,&thread_status);
     return 0;
 }

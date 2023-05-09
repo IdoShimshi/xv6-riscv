@@ -97,3 +97,5 @@ struct kthread
   struct trapframe *trapframe;  // data page for trampoline.S
   struct context context;      // swtch() here to run thread
 };
+
+#define STACK_SIZE 4000

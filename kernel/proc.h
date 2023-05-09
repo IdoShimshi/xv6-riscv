@@ -11,6 +11,7 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
+  int exiting;
 
   int threadsCounter; 
   struct spinlock counterLock;  // lock for threads counter

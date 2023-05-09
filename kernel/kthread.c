@@ -119,6 +119,8 @@ void freekthread(struct kthread* k){
 // init some of this thread fields
 // return tid or -1 if no UNUSED thread found
 int kthread_create(void *(*start_func)(), void *stack, uint stack_size){
+if (!stack || stack_size > STACK_SIZE)
+  return -1;
 struct proc* p = myproc();
 struct kthread *kt = allocthread(p);
 // no thread was initialized

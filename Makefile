@@ -138,6 +138,7 @@ UPROGS=\
 	$U/_testkthreadcreate\
 	$U/_testkthreadexec\
 	$U/_testkthreadexit\
+	$U/_testkthreadexitsyscall\
 	$U/_testkthreadfork\
 	$U/_testkthreadkilljoin\
 
