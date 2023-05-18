@@ -155,11 +155,13 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  removeSwapFile(p);
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  p->swapFile = 0;
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -313,6 +315,9 @@ fork(void)
   pid = np->pid;
 
   release(&np->lock);
+
+  createSwapFile(np);
+  copySwapFile(p, np);
 
   acquire(&wait_lock);
   np->parent = p;
@@ -680,4 +685,56 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+uint64 pageSwapPolicy(){
+  return 0;
+}
+
+int getPageFromSwapFile(struct proc *p, uint64 va){
+  void* pa;
+  int index;
+  pte_t *entry = walk(p->pagetable, va, 0);
+  int perm = *entry & (PTE_R | PTE_W | PTE_X);
+  for (index = 0; index < MAX_TOTAL_PAGES; index++)
+  {
+    if (p->swapMetadata[index] == va){
+      p->swapMetadata[index] = 0;
+      pa = kalloc();
+      if (readFromSwapFile(p, (char*)pa, index*PGSIZE, PGSIZE) < PGSIZE)
+        return -1;
+      if (mappages(p->pagetable, va, PGSIZE,(uint64) pa, perm) == -1)
+        return -1;
+      return 0;
+    }
+  }
+  return -1;
+}
+
+int swapPageOut(struct proc *p){
+  uint64 va = pageSwapPolicy();
+  uint64 pa = walkaddr(p->pagetable, va);
+  pte_t* toSwapEntry = walk(p->pagetable, va, 0);
+  int index;
+  for (index = 0; index < MAX_TOTAL_PAGES; index++)
+  {
+    if (p->swapMetadata[index] == 0)
+      break;
+  }
+  if (p->swapMetadata[index] == 0)
+    return -1;
+  p->swapMetadata[index] = va;
+  if (writeToSwapFile(p, (char*) pa, index*PGSIZE, PGSIZE) < PGSIZE)
+    return -1;
+  kfree((void*)pa);
+  *toSwapEntry |= PTE_PG;
+  *toSwapEntry &= ~PTE_V;
+  return 0;
+}
+
+// read each page from parent->swapFile to buffer
+// write buffer to p->swapFile
+// copy swapMetadata from parent to p
+int copySwapFile(struct proc *parent, struct proc* p){
+  
 }

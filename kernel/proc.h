@@ -106,4 +106,5 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
+  uint64 swapMetadata[MAX_TOTAL_PAGES];
 };
