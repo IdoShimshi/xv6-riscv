@@ -445,7 +445,7 @@ wait(uint64 addr)
 void updateDatastructures(struct proc *p){
   int i=0;
   
-  for(i;i<MAX_TOTAL_PAGES;i++){
+  for(i = 0;i<MAX_TOTAL_PAGES;i++){
     if(p->swapMetadata[i].va != 0){
       pte_t *pt = walk(p->pagetable, p->swapMetadata[i].va, 0);
       p->swapMetadata[i].agingCounter = (p->swapMetadata[i].agingCounter >> 1);
@@ -740,7 +740,7 @@ int pageSwapPolicy(struct proc *p){
   int i=0;
   //SWAP_ALGO=NFUA
   if(1){
-    for(i;i<MAX_TOTAL_PAGES;i++){
+    for(i = 0; i < MAX_TOTAL_PAGES ;i++){
       if(p->swapMetadata[i].inFile == -1 && p->swapMetadata[i].agingCounter < lowestCounter){
         lowestCounter = p->swapMetadata[i].agingCounter;
         ans = i;
@@ -751,11 +751,11 @@ int pageSwapPolicy(struct proc *p){
   //SWAP_ALGO=LAPA
   // finds the page with the lowest numbers of one's at agingCounter
   if(2){
-    lowestCounter = countsOnes(p->swapMetadata[0].agingCounter);
+    lowestCounter = countOnes(p->swapMetadata[0].agingCounter);
     ans = 0;
-    for(i;i<MAX_TOTAL_PAGES;i++){
-      if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countsOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
-        lowestCounter = countsOnes(p->swapMetadata[i].agingCounter);
+    for(i = 0;i < MAX_TOTAL_PAGES;i++){
+      if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
+        lowestCounter = countOnes(p->swapMetadata[i].agingCounter);
         ans = i;
       }
     }
@@ -765,8 +765,8 @@ int pageSwapPolicy(struct proc *p){
   // 
   if(3){
     // for(i;i<MAX_TOTAL_PAGES;i++){
-    //   if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countsOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
-    //     lowestCounter = countsOnes(p->swapMetadata[i].agingCounter);
+    //   if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
+    //     lowestCounter = countOnes(p->swapMetadata[i].agingCounter);
     //     ans = i;
     //   }
     // }
@@ -786,11 +786,11 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
   for (index = 0; index < MAX_TOTAL_PAGES; index++)
   {
     if (p->swapMetadata[index].va == va){
-      if (fileIndex = p->swapMetadata[index].inFile == -1)
+      if ((fileIndex = p->swapMetadata[index].inFile) == -1)
         return -1; // page already in ram
       pa = kalloc();
       acquire(&p->lock);
-      p->swapMetadata[index].pa = pa;
+      p->swapMetadata[index].pa = (uint64) pa;
       p->swapMetadata[index].inFile = -1;
       p->swapMetadata[index].agingCounter = 0;
       p->pagesInRam++;
@@ -813,7 +813,7 @@ int swapPageOut(struct proc *p){
   pte_t* toSwapEntry = walk(p->pagetable, p->swapMetadata[metadataIndex].va, 0);
 
   int fileIndex;
-  if(fileIndex = findSmallestFreeFileIndex(p) == -1)
+  if((fileIndex = findSmallestFreeFileIndex(p)) == -1)
     return -1; 
 
   if (writeToSwapFile(p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE)
@@ -868,16 +868,17 @@ int newPage(uint64 va, uint64 pa){
   acquire(&p->lock);
 
   if (++(p->pageNum) > MAX_TOTAL_PAGES){
-    printf("Max total pages exceeded");
+    printf("Max total pages exceeded\n");
     release(&p->lock);
     return -1;
   }
   if (++(p->pagesInRam) > MAX_PSYC_PAGES)
   {
-    if (swapPageOut(p) == -1)
-      printf("error swapping page out");
+    if (swapPageOut(p) == -1){
+      printf("error swapping page out\n");
       release(&p->lock);
       return -1;
+    }
   }
 
   for (int i = 0; i < MAX_TOTAL_PAGES; i++)
@@ -891,7 +892,7 @@ int newPage(uint64 va, uint64 pa){
       return 0;
     }
   }
-  printf("couldnt find a free spot at swapMetadata");
+  printf("couldnt find a free spot at swapMetadata\n");
   release(&p->lock);
   return -1;
 }
@@ -915,7 +916,7 @@ int removePage(uint64 va){
       return 0;
     }
   }
-  printf("couldnt find page to remove");
+  printf("couldnt find page to remove\n");
   release(&p->lock);
   return -1;
 }
