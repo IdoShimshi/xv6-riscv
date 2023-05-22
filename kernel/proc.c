@@ -443,13 +443,20 @@ wait(uint64 addr)
 
 void updateDatastructures(struct proc *p){
   int i=0;
+  
   for(i;i<MAX_TOTAL_PAGES;i++){
-    if( *walk(p->pagetable, p->swapMetadata[i].va, 0) & PTE_A){
-      p->swapMetadata[0].agingCounter = (pte >> 1) | PTE_A;
-      
+    if(p->swapMetadata[i].va != 0){
+      pte_t *pt = walk(p->pagetable, p->swapMetadata[i].va, 0);
+      p->swapMetadata[i].agingCounter = (p->swapMetadata[i].agingCounter >> 1);
+      if( *pt & PTE_A){
+        p->swapMetadata[i].agingCounter = p->swapMetadata[i].agingCounter | (1 << 31);
+        *pt &= ~PTE_A;
+     }
     }
   }
 };
+
+
 
 
 // Per-CPU process scheduler.
@@ -718,6 +725,14 @@ int findSmallestFreeFileIndex(struct proc *p){
   return -1;
 }
 
+int countOnes(uint input) {
+  int count = 0;
+  while (input != 0) {
+    count += input & 1;  // Check the least significant bit
+    input >>= 1;        // Shift input right by 1 bit
+  }
+  return count;
+}
 int pageSwapPolicy(struct proc *p){
   int lowestCounter = p->swapMetadata[0].agingCounter;
   uint ans=0;
@@ -725,13 +740,38 @@ int pageSwapPolicy(struct proc *p){
   //SWAP_ALGO=NFUA
   if(1){
     for(i;i<MAX_TOTAL_PAGES;i++){
-      if(p->swapMetadata[i].inFile=0 && p->swapMetadata[i].agingCounter < lowestCounter){
+      if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && p->swapMetadata[i].agingCounter < lowestCounter){
         lowestCounter = p->swapMetadata[i].agingCounter;
         ans = i;
       }
     }
     return ans;
   }
+  //SWAP_ALGO=LAPA
+  // finds the page with the lowest numbers of one's at agingCounter
+  if(2){
+    lowestCounter = countsOnes(p->swapMetadata[0].agingCounter);
+    ans = 0;
+    for(i;i<MAX_TOTAL_PAGES;i++){
+      if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countsOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
+        lowestCounter = countsOnes(p->swapMetadata[i].agingCounter);
+        ans = i;
+      }
+    }
+    return ans;
+  }
+  //SWAP_ALGO=SCFIFO
+  // 
+  if(3){
+    // for(i;i<MAX_TOTAL_PAGES;i++){
+    //   if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countsOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
+    //     lowestCounter = countsOnes(p->swapMetadata[i].agingCounter);
+    //     ans = i;
+    //   }
+    // }
+    return ans;
+  }
+
 
   return 0;
 }

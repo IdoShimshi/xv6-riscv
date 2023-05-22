@@ -86,7 +86,7 @@ struct pagingMetadata {
   uint64 pa;
   uint64 va;
   int inFile; // -1 if in ram, else will contain index in file
-  int agingCounter;
+  uint agingCounter;
 };
 
 // Per-process state
