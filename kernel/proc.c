@@ -321,6 +321,7 @@ fork(void)
   if (p != initproc)
     copySwapFile(p, np);
 
+
   acquire(&wait_lock);
   np->parent = p;
   release(&wait_lock);
@@ -708,12 +709,12 @@ int findSmallestFreeFileIndex(struct proc *p){
 
 int pageSwapPolicy(struct proc *p){
   int lowestCounter = p->swapMetadata[0].agingCounter;
-  uint ans=0;
+  int ans=0;
   int i=0;
   //SWAP_ALGO=NFUA
   if(1){
     for(i;i<MAX_TOTAL_PAGES;i++){
-      if(p->swapMetadata[i].inFile=0 && p->swapMetadata[i].agingCounter < lowestCounter){
+      if(p->swapMetadata[i].inFile == -1 && p->swapMetadata[i].agingCounter < lowestCounter){
         lowestCounter = p->swapMetadata[i].agingCounter;
         ans = i;
       }
@@ -729,20 +730,25 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
   int index;
   int fileIndex;
   pte_t *entry = walk(p->pagetable, va, 0);
-  int perm = *entry & (PTE_R | PTE_W | PTE_X);
+  int perm = PTE_FLAGS(*entry);
   for (index = 0; index < MAX_TOTAL_PAGES; index++)
   {
     if (p->swapMetadata[index].va == va){
       if (fileIndex = p->swapMetadata[index].inFile == -1)
         return -1; // page already in ram
       pa = kalloc();
+      acquire(&p->lock);
       p->swapMetadata[index].pa = pa;
       p->swapMetadata[index].inFile = -1;
+      p->swapMetadata[index].agingCounter = 0;
+      p->pagesInRam++;
+      release(&p->lock);
       if (readFromSwapFile(p, (char*)pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE)
         return -1;
       if (mappages(p->pagetable, va, PGSIZE,(uint64) pa, perm) == -1)
         return -1;
       *entry &= ~PTE_PG;
+
       return 0;
     }
   }
@@ -764,10 +770,13 @@ int swapPageOut(struct proc *p){
   *toSwapEntry |= PTE_PG;
   *toSwapEntry &= ~PTE_V;
 
+  acquire(&p->lock);
   p->swapMetadata[metadataIndex].pa = 0;
   p->swapMetadata[metadataIndex].inFile = fileIndex;
+  p->pagesInRam--;
+  release(&p->lock);
 
-  return 0;
+  return metadataIndex;
 }
 
 // read each page from parent->swapFile to buffer
@@ -794,5 +803,67 @@ int copySwapFile(struct proc *parent, struct proc* p) {
     for (int i = 0;  p->swapMetadata !=0 && i < MAX_TOTAL_PAGES; i++) {
         p->swapMetadata[i] = parent->swapMetadata[i];
     }
+    p->pageNum = parent->pageNum;
+    p->pagesInRam = parent->pagesInRam;
     return 0; // Success
+}
+
+int newPage(uint64 va, uint64 pa){
+  struct proc *p = myproc();
+  if (p == initproc)
+    return 0;
+  
+  acquire(&p->lock);
+
+  if (++(p->pageNum) > MAX_TOTAL_PAGES){
+    printf("Max total pages exceeded");
+    release(&p->lock);
+    return -1;
+  }
+  if (++(p->pagesInRam) > MAX_PSYC_PAGES)
+  {
+    if (swapPageOut(p) == -1)
+      printf("error swapping page out");
+      release(&p->lock);
+      return -1;
+  }
+
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++)
+  {
+    if (p->swapMetadata[i].va == 0){
+      p->swapMetadata[i].va = va;
+      p->swapMetadata[i].pa = pa;
+      p->swapMetadata[i].inFile = -1;
+      p->swapMetadata[i].agingCounter = 0;
+      release(&p->lock);
+      return 0;
+    }
+  }
+  printf("couldnt find a free spot at swapMetadata");
+  release(&p->lock);
+  return -1;
+}
+
+int removePage(uint64 va){
+  struct proc *p = myproc();
+  if (p == initproc)
+    return 0;
+
+  acquire(&p->lock);
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++)
+  {
+    if (p->swapMetadata[i].va == va){
+      p->swapMetadata[i].va = 0;
+      p->swapMetadata[i].pa = 0;
+      p->swapMetadata[i].inFile = -1;
+      p->swapMetadata[i].agingCounter = 0;
+      p->pagesInRam--;
+      p->pageNum--;
+      release(&p->lock);
+      return 0;
+    }
+  }
+  printf("couldnt find page to remove");
+  release(&p->lock);
+  return -1;
 }

@@ -84,7 +84,7 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
   
 struct pagingMetadata {
   uint64 pa;
-  uint64 va;
+  uint64 va; // 0 if no page
   int inFile; // -1 if in ram, else will contain index in file
   int agingCounter;
 };
@@ -115,5 +115,7 @@ struct proc {
 
   struct file *swapFile;
   struct pagingMetadata swapMetadata[MAX_TOTAL_PAGES];
+  int pageNum;
+  int pagesInRam;
 };
 
