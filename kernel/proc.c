@@ -707,7 +707,21 @@ int findSmallestFreeFileIndex(struct proc *p){
 }
 
 int pageSwapPolicy(struct proc *p){
-  return 1;
+  int lowestCounter = p->swapMetadata[0].agingCounter;
+  uint ans=0;
+  int i=0;
+  //SWAP_ALGO=NFUA
+  if(1){
+    for(i;i<MAX_TOTAL_PAGES;i++){
+      if(p->swapMetadata[i].inFile=0 && p->swapMetadata[i].agingCounter < lowestCounter){
+        lowestCounter = p->swapMetadata[i].agingCounter;
+        ans = i;
+      }
+    }
+    return ans;
+  }
+
+  return 0;
 }
 
 int getPageFromSwapFile(struct proc *p, uint64 va){
@@ -759,6 +773,26 @@ int swapPageOut(struct proc *p){
 // read each page from parent->swapFile to buffer
 // write buffer to p->swapFile
 // copy swapMetadata from parent to p
-int copySwapFile(struct proc *parent, struct proc* p){
-  
+int copySwapFile(struct proc *parent, struct proc* p) {
+    char buffer[PGSIZE];
+    // Iterate through each page in the parent's swapFile
+    int lastRead = PGSIZE;
+    int fileOffset = 0;
+    while(lastRead==PGSIZE){
+      // read page by page
+      lastRead = readFromSwapFile(parent, buffer, fileOffset, PGSIZE);
+      if(writeToSwapFile(p,buffer,fileOffset,lastRead)==-1){
+        return -1;
+      }
+      fileOffset = fileOffset + PGSIZE;
+    }
+    if (lastRead < 0){
+        // Error occurred while reading from swap file
+        return -1;
+    }
+    // deep copy parent swapMetaData
+    for (int i = 0;  p->swapMetadata !=0 && i < MAX_TOTAL_PAGES; i++) {
+        p->swapMetadata[i] = parent->swapMetadata[i];
+    }
+    return 0; // Success
 }
