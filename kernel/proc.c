@@ -439,6 +439,17 @@ wait(uint64 addr)
   }
 }
 
+void updateDatastructures(struct proc *p){
+  int i=0;
+  for(i;i<MAX_TOTAL_PAGES;i++){
+    if( *walk(p->pagetable, p->swapMetadata[i].va, 0) & PTE_A){
+      p->swapMetadata[0].agingCounter = (pte >> 1) | PTE_A;
+      
+    }
+  }
+};
+
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -471,6 +482,7 @@ scheduler(void)
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
+      updateDatastructures(p);
       release(&p->lock);
     }
   }
