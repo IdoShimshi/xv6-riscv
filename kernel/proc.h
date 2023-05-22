@@ -115,6 +115,5 @@ struct proc {
 
   struct file *swapFile;
   struct pagingMetadata swapMetadata[MAX_TOTAL_PAGES];
-  uint64 swapMetadata[MAX_TOTAL_PAGES];
 };
 

@@ -317,7 +317,9 @@ fork(void)
   release(&np->lock);
 
   createSwapFile(np);
-  copySwapFile(p, np);
+  // handle case where parent does not have swapfile (init)
+  if (p != initproc)
+    copySwapFile(p, np);
 
   acquire(&wait_lock);
   np->parent = p;
@@ -699,15 +701,32 @@ procdump(void)
   }
 }
 
-uint64 pageSwapPolicy(){
-  int lowestCounter = swapMetadata[0]->agingCounter;
+int findSmallestFreeFileIndex(struct proc *p){
+  int indexs[MAX_TOTAL_PAGES];
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++)
+  {
+    if (p->swapMetadata[i].inFile != -1)
+      indexs[p->swapMetadata[i].inFile] = 1;
+  }
+
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++)
+  {
+    if (indexs[i] == 0)
+      return i;
+  }
+
+  return -1;
+}
+
+int pageSwapPolicy(struct proc *p){
+  int lowestCounter = p->swapMetadata[0].agingCounter;
   uint ans=0;
   int i=0;
   //SWAP_ALGO=NFUA
   if(1){
     for(i;i<MAX_TOTAL_PAGES;i++){
-      if(swapMetadata[i]->inFile=0 && swapMetadata[i]->agingCounter<lowestCounter){
-        lowestCounter = swapMetadata[i]->agingCounter;
+      if(p->swapMetadata[i].inFile=0 && p->swapMetadata[i].agingCounter < lowestCounter){
+        lowestCounter = p->swapMetadata[i].agingCounter;
         ans = i;
       }
     }
@@ -720,17 +739,22 @@ uint64 pageSwapPolicy(){
 int getPageFromSwapFile(struct proc *p, uint64 va){
   void* pa;
   int index;
+  int fileIndex;
   pte_t *entry = walk(p->pagetable, va, 0);
   int perm = *entry & (PTE_R | PTE_W | PTE_X);
   for (index = 0; index < MAX_TOTAL_PAGES; index++)
   {
-    if (p->swapMetadata[index] == va){
-      p->swapMetadata[index] = 0;
+    if (p->swapMetadata[index].va == va){
+      if (fileIndex = p->swapMetadata[index].inFile == -1)
+        return -1; // page already in ram
       pa = kalloc();
-      if (readFromSwapFile(p, (char*)pa, index*PGSIZE, PGSIZE) < PGSIZE)
+      p->swapMetadata[index].pa = pa;
+      p->swapMetadata[index].inFile = -1;
+      if (readFromSwapFile(p, (char*)pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE)
         return -1;
       if (mappages(p->pagetable, va, PGSIZE,(uint64) pa, perm) == -1)
         return -1;
+      *entry &= ~PTE_PG;
       return 0;
     }
   }
@@ -738,23 +762,23 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
 }
 
 int swapPageOut(struct proc *p){
-  uint64 va = pageSwapPolicy();
-  uint64 pa = walkaddr(p->pagetable, va);
-  pte_t* toSwapEntry = walk(p->pagetable, va, 0);
-  int index;
-  for (index = 0; index < MAX_TOTAL_PAGES; index++)
-  {
-    if (p->swapMetadata[index] == 0)
-      break;
-  }
-  if (p->swapMetadata[index] == 0)
+  // evicts a page from proc p's pages in ram.
+  int metadataIndex = pageSwapPolicy(p);
+  pte_t* toSwapEntry = walk(p->pagetable, p->swapMetadata[metadataIndex].va, 0);
+
+  int fileIndex;
+  if(fileIndex = findSmallestFreeFileIndex(p) == -1)
+    return -1; 
+
+  if (writeToSwapFile(p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE)
     return -1;
-  p->swapMetadata[index] = va;
-  if (writeToSwapFile(p, (char*) pa, index*PGSIZE, PGSIZE) < PGSIZE)
-    return -1;
-  kfree((void*)pa);
+  kfree((void*) p->swapMetadata[metadataIndex].pa);
   *toSwapEntry |= PTE_PG;
   *toSwapEntry &= ~PTE_V;
+
+  p->swapMetadata[metadataIndex].pa = 0;
+  p->swapMetadata[metadataIndex].inFile = fileIndex;
+
   return 0;
 }
 
