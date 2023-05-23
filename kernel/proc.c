@@ -26,6 +26,10 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+
+char buffer[PGSIZE];
+struct spinlock buffer_lock;
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -51,6 +55,8 @@ procinit(void)
   
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&buffer_lock, "buffer_lock");
+  
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
@@ -155,12 +161,13 @@ found:
 static void
 freeproc(struct proc *p)
 {
-  removeSwapFile(p);
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+  if(p->pagetable){
     proc_freepagetable(p->pagetable, p->sz);
+  }
+    
   p->swapFile = 0;
   p->pagetable = 0;
   p->sz = 0;
@@ -171,6 +178,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -284,7 +292,6 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
-
   // Allocate process.
   if((np = allocproc()) == 0){
     return -1;
@@ -318,9 +325,13 @@ fork(void)
 
   createSwapFile(np);
   // handle case where parent does not have swapfile (init)
-  if (p != initproc)
+  if (np->pid == 2){ // shell
+    initMetadata(np);
+  }
+  if (p != initproc){ // if parent is init, dont copy its file.
     copySwapFile(p, np);
-
+  }
+    
 
   acquire(&wait_lock);
   np->parent = p;
@@ -329,7 +340,6 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
-
   return pid;
 }
 
@@ -359,6 +369,7 @@ exit(int status)
   if(p == initproc)
     panic("init exiting");
 
+  removeSwapFile(p);
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
     if(p->ofile[fd]){
@@ -711,10 +722,12 @@ procdump(void)
 
 int findSmallestFreeFileIndex(struct proc *p){
   int indexs[MAX_TOTAL_PAGES];
+  memset(indexs, 0, sizeof(int) * MAX_TOTAL_PAGES);
   for (int i = 0; i < MAX_TOTAL_PAGES; i++)
   {
-    if (p->swapMetadata[i].inFile != -1)
+    if (p->swapMetadata[i].inFile != -1){
       indexs[p->swapMetadata[i].inFile] = 1;
+    }
   }
 
   for (int i = 0; i < MAX_TOTAL_PAGES; i++)
@@ -735,16 +748,19 @@ int countOnes(uint input) {
   return count;
 }
 int pageSwapPolicy(struct proc *p){
-  int lowestCounter = p->swapMetadata[0].agingCounter;
+  int lowestCounter = -1;
   int ans=0;
   int i=0;
   //SWAP_ALGO=NFUA
   if(1){
     for(i = 0; i < MAX_TOTAL_PAGES ;i++){
-      if(p->swapMetadata[i].inFile == -1 && p->swapMetadata[i].agingCounter < lowestCounter){
-        lowestCounter = p->swapMetadata[i].agingCounter;
-        ans = i;
+      if (p->swapMetadata[i].inFile == -1 && p->swapMetadata[i].va != 0){ //make sure page in ram
+        if(p->swapMetadata[i].agingCounter < lowestCounter || lowestCounter == -1){
+          lowestCounter = p->swapMetadata[i].agingCounter;
+          ans = i;
       }
+      }
+      
     }
     return ans;
   }
@@ -807,27 +823,28 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
   return -1;
 }
 
+
 int swapPageOut(struct proc *p){
   // evicts a page from proc p's pages in ram.
   int metadataIndex = pageSwapPolicy(p);
   pte_t* toSwapEntry = walk(p->pagetable, p->swapMetadata[metadataIndex].va, 0);
-
   int fileIndex;
-  if((fileIndex = findSmallestFreeFileIndex(p)) == -1)
+  if((fileIndex = findSmallestFreeFileIndex(p)) == -1){
     return -1; 
-
-  if (writeToSwapFile(p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE)
+  }
+  if (writeToSwapFile(p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE){
     return -1;
+  }
+    
   kfree((void*) p->swapMetadata[metadataIndex].pa);
   *toSwapEntry |= PTE_PG;
   *toSwapEntry &= ~PTE_V;
-
+  
   acquire(&p->lock);
   p->swapMetadata[metadataIndex].pa = 0;
   p->swapMetadata[metadataIndex].inFile = fileIndex;
   p->pagesInRam--;
   release(&p->lock);
-
   return metadataIndex;
 }
 
@@ -835,10 +852,13 @@ int swapPageOut(struct proc *p){
 // write buffer to p->swapFile
 // copy swapMetadata from parent to p
 int copySwapFile(struct proc *parent, struct proc* p) {
-    char buffer[PGSIZE];
     // Iterate through each page in the parent's swapFile
     int lastRead = PGSIZE;
     int fileOffset = 0;
+    fileOffset++;
+    
+    fileOffset--;
+    acquire(&buffer_lock);
     while(lastRead==PGSIZE){
       // read page by page
       lastRead = readFromSwapFile(parent, buffer, fileOffset, PGSIZE);
@@ -847,6 +867,7 @@ int copySwapFile(struct proc *parent, struct proc* p) {
       }
       fileOffset = fileOffset + PGSIZE;
     }
+    release(&buffer_lock);
     if (lastRead < 0){
         // Error occurred while reading from swap file
         return -1;
@@ -864,7 +885,7 @@ int newPage(uint64 va, uint64 pa){
   struct proc *p = myproc();
   if (p == initproc)
     return 0;
-  
+  // printf("in new page, pid %d has %d pages in ram, %d in total\n",p->pid, p->pagesInRam, p->pageNum);
   acquire(&p->lock);
 
   if (++(p->pageNum) > MAX_TOTAL_PAGES){
@@ -874,13 +895,14 @@ int newPage(uint64 va, uint64 pa){
   }
   if (++(p->pagesInRam) > MAX_PSYC_PAGES)
   {
+    release(&p->lock);
     if (swapPageOut(p) == -1){
       printf("error swapping page out\n");
-      release(&p->lock);
       return -1;
     }
+    acquire(&p->lock);
   }
-
+  
   for (int i = 0; i < MAX_TOTAL_PAGES; i++)
   {
     if (p->swapMetadata[i].va == 0){
@@ -899,7 +921,7 @@ int newPage(uint64 va, uint64 pa){
 
 int removePage(uint64 va){
   struct proc *p = myproc();
-  if (p == initproc)
+  if (p->pid < 3)
     return 0;
 
   acquire(&p->lock);
@@ -916,7 +938,31 @@ int removePage(uint64 va){
       return 0;
     }
   }
-  printf("couldnt find page to remove\n");
+  printf("couldnt find page to remove %d, %s\n", p->pid, p->name);
   release(&p->lock);
   return -1;
+}
+
+void printMetadata(struct proc *p){
+  printf("proc - %d, %s\n", p->pid, p->name);
+  printf("proc metadata:\n");
+  printf("index|     va     |     pa     | inFile | agingCounter | :\n");
+  printf("-----|------------|------------|--------|--------------| :\n");
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++)
+  {
+    struct pagingMetadata pm = p->swapMetadata[i];
+    printf(" %d  |%x|%x|   %d   |    %d    | :\n", i, pm.va, pm.pa, pm.inFile, pm.agingCounter );
+  }
+  
+}
+
+void initMetadata(struct proc *p){
+  for (int i = 0; i < MAX_TOTAL_PAGES; i++)
+  {
+    p->swapMetadata[i].va = 0;
+    p->swapMetadata[i].pa = 0;
+    p->swapMetadata[i].inFile = -1;
+    p->swapMetadata[i].agingCounter = 0;
+  }
+  
 }

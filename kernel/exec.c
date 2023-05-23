@@ -61,6 +61,12 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
+
+    // reset p-> metadata, preparing it for the new process, might break if goto bad happens
+    initMetadata(p);
+    p->pageNum = 0;
+    p->pagesInRam = 0;
+
     uint64 sz1;
     if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags2perm(ph.flags))) == 0)
       goto bad;

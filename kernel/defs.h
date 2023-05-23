@@ -117,6 +117,8 @@ int             swapPageOut(struct proc *p);
 int             newPage(uint64 va, uint64 pa);
 int             removePage(uint64 va);
 int             copySwapFile(struct proc *parent, struct proc* p);
+void            printMetadata(struct proc *p);
+void            initMetadata(struct proc *p);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
