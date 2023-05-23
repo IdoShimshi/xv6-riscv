@@ -318,7 +318,10 @@ fork(void)
 
   createSwapFile(np);
   // handle case where parent does not have swapfile (init)
-  if (p != initproc)
+  printf("pid: %d parent swapfile addr %x\n",p->pid,p->swapFile);
+  printf("pid: %d child swapfile addr %x\n",np->pid,np->swapFile);
+
+  if (p != initproc && p->pid>2)
     copySwapFile(p, np);
 
 
@@ -778,6 +781,7 @@ int pageSwapPolicy(struct proc *p){
 }
 
 int getPageFromSwapFile(struct proc *p, uint64 va){
+  printf("getPageFromSwapFile  func\n");
   void* pa;
   int index;
   int fileIndex;
@@ -839,6 +843,7 @@ int copySwapFile(struct proc *parent, struct proc* p) {
     // Iterate through each page in the parent's swapFile
     int lastRead = PGSIZE;
     int fileOffset = 0;
+    printf("+++++++++++++++++\n");
     while(lastRead==PGSIZE){
       // read page by page
       lastRead = readFromSwapFile(parent, buffer, fileOffset, PGSIZE);
@@ -899,7 +904,7 @@ int newPage(uint64 va, uint64 pa){
 
 int removePage(uint64 va){
   struct proc *p = myproc();
-  if (p == initproc)
+  if (p == initproc || p->pid < 3)
     return 0;
 
   acquire(&p->lock);
@@ -920,3 +925,11 @@ int removePage(uint64 va){
   release(&p->lock);
   return -1;
 }
+
+  int addToQueue(int index){
+    return 0;
+  };
+  int removeFromQueueByPolicy(){
+    return 0;
+  };
+

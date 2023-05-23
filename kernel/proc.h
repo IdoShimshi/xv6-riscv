@@ -87,7 +87,10 @@ struct pagingMetadata {
   uint64 va; // 0 if no page
   int inFile; // -1 if in ram, else will contain index in file
   uint agingCounter;
+  int next;
+  int prev;
 };
+
 
 // Per-process state
 struct proc {
@@ -117,5 +120,11 @@ struct proc {
   struct pagingMetadata swapMetadata[MAX_TOTAL_PAGES];
   int pageNum;
   int pagesInRam;
-};
+
+  int queueCurrentSize=0;
+  int clock_hand=0;
+
+  int addToQueue(int index);
+  int removeFromQueueByPolicy();
+}
 
