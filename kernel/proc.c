@@ -794,6 +794,7 @@ int pageSwapPolicy(struct proc *p){
 }
 
 int getPageFromSwapFile(struct proc *p, uint64 va){
+  printf("getPageFromSwapFile  func\n");
   void* pa;
   int index;
   int fileIndex;
@@ -855,10 +856,6 @@ int copySwapFile(struct proc *parent, struct proc* p) {
     // Iterate through each page in the parent's swapFile
     int lastRead = PGSIZE;
     int fileOffset = 0;
-    fileOffset++;
-    
-    fileOffset--;
-    acquire(&buffer_lock);
     while(lastRead==PGSIZE){
       // read page by page
       lastRead = readFromSwapFile(parent, buffer, fileOffset, PGSIZE);
@@ -942,6 +939,15 @@ int removePage(uint64 va){
   release(&p->lock);
   return -1;
 }
+
+  int addToQueue(int index){
+    return 0;
+  };
+  int removeFromQueueByPolicy(){
+    return 0;
+  };
+
+
 
 void printMetadata(struct proc *p){
   printf("proc - %d, %s\n", p->pid, p->name);
