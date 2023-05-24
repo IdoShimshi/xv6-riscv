@@ -121,10 +121,6 @@ struct proc {
   int pageNum;
   int pagesInRam;
 
-  int queueCurrentSize=0;
-  int clock_hand=0;
-
-  int addToQueue(int index);
-  int removeFromQueueByPolicy();
-}
-
+  int queueCurrentSize;
+  int clock_hand;
+};

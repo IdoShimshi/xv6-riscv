@@ -798,6 +798,7 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
   void* pa;
   int index;
   int fileIndex;
+  va = PGROUNDDOWN(va);
   pte_t *entry = walk(p->pagetable, va, 0);
   int perm = PTE_FLAGS(*entry);
   for (index = 0; index < MAX_TOTAL_PAGES; index++)
@@ -856,6 +857,7 @@ int copySwapFile(struct proc *parent, struct proc* p) {
     // Iterate through each page in the parent's swapFile
     int lastRead = PGSIZE;
     int fileOffset = 0;
+    acquire(&buffer_lock);
     while(lastRead==PGSIZE){
       // read page by page
       lastRead = readFromSwapFile(parent, buffer, fileOffset, PGSIZE);
@@ -946,7 +948,6 @@ int removePage(uint64 va){
   int removeFromQueueByPolicy(){
     return 0;
   };
-
 
 
 void printMetadata(struct proc *p){
