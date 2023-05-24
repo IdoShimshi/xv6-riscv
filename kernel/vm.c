@@ -230,6 +230,8 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
 {
   char *mem;
   uint64 a;
+  if (oldsz == 0)
+    printf("here\n");
 
   if(newsz < oldsz)
     return oldsz;

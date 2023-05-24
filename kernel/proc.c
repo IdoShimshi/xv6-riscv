@@ -799,6 +799,7 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
   int index;
   int fileIndex;
   va = PGROUNDDOWN(va);
+
   pte_t *entry = walk(p->pagetable, va, 0);
   int perm = PTE_FLAGS(*entry);
   for (index = 0; index < MAX_TOTAL_PAGES; index++)
@@ -837,7 +838,6 @@ int swapPageOut(struct proc *p){
   if (writeToSwapFile(p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE){
     return -1;
   }
-    
   kfree((void*) p->swapMetadata[metadataIndex].pa);
   *toSwapEntry |= PTE_PG;
   *toSwapEntry &= ~PTE_V;
@@ -884,7 +884,7 @@ int newPage(uint64 va, uint64 pa){
   struct proc *p = myproc();
   if (p == initproc)
     return 0;
-  // printf("in new page, pid %d has %d pages in ram, %d in total\n",p->pid, p->pagesInRam, p->pageNum);
+  printf("in new page, pid %d has %d pages in ram, %d in total\n",p->pid, p->pagesInRam, p->pageNum);
   acquire(&p->lock);
 
   if (++(p->pageNum) > MAX_TOTAL_PAGES){
