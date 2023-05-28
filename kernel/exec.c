@@ -31,6 +31,21 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
+  // backup of old metadata
+  struct pagingMetadata swapMetadata[MAX_TOTAL_PAGES];
+  int pageNum;
+  int pagesInRam;
+  for (int i = 0;  i < MAX_TOTAL_PAGES; i++) {
+        swapMetadata[i] = p->swapMetadata[i];
+    }
+  pageNum = p->pageNum;
+  pagesInRam = p->pagesInRam;
+
+  // reset p-> metadata, preparing it for the new process, might break if goto bad happens
+  initMetadata(p);
+  p->pageNum = 0;
+  p->pagesInRam = 0;
+
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -61,11 +76,6 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
-
-    // reset p-> metadata, preparing it for the new process, might break if goto bad happens
-    initMetadata(p);
-    p->pageNum = 0;
-    p->pagesInRam = 0;
 
     uint64 sz1;
     if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags2perm(ph.flags))) == 0)
@@ -132,13 +142,24 @@ exec(char *path, char **argv)
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
+  p->inExec = 1;
   proc_freepagetable(oldpagetable, oldsz);
-
+  p->inExec = 0;
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
-  if(pagetable)
+  for (int i = 0;  i < MAX_TOTAL_PAGES; i++) {
+        p->swapMetadata[i] = swapMetadata[i];
+    }
+  p->pageNum = pageNum;
+  p->pagesInRam = pagesInRam;
+
+  if(pagetable){
+    p->inExec = 1;
     proc_freepagetable(pagetable, sz);
+    p->inExec = 0;
+  }
+    
   if(ip){
     iunlockput(ip);
     end_op();

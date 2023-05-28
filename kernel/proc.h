@@ -116,6 +116,7 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
+  int inExec;
   struct file *swapFile;
   struct pagingMetadata swapMetadata[MAX_TOTAL_PAGES];
   int pageNum;

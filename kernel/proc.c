@@ -130,6 +130,12 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->inExec = 0;
+  p->pageNum = 0;
+  p->pagesInRam = 0;
+  p->queueCurrentSize = 0;
+  p->clock_hand = 0;
+
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -882,18 +888,21 @@ int copySwapFile(struct proc *parent, struct proc* p) {
 
 int newPage(uint64 va, uint64 pa){
   struct proc *p = myproc();
+  pte_t* ptt = walk(p->pagetable,va, 0);
   if (p == initproc)
     return 0;
+  if ((*ptt & PTE_U) == 0)
+    return 0;
+  
   printf("in new page, pid %d has %d pages in ram, %d in total\n",p->pid, p->pagesInRam, p->pageNum);
   acquire(&p->lock);
 
-  if (++(p->pageNum) > MAX_TOTAL_PAGES){
+  if (++(p->pageNum) > MAX_TOTAL_PAGES && p->pid > 2){
     printf("Max total pages exceeded\n");
     release(&p->lock);
     return -1;
   }
-  if (++(p->pagesInRam) > MAX_PSYC_PAGES)
-  {
+  if (++(p->pagesInRam) > MAX_PSYC_PAGES && p->pid > 2){
     release(&p->lock);
     if (swapPageOut(p) == -1){
       printf("error swapping page out\n");
@@ -921,6 +930,8 @@ int newPage(uint64 va, uint64 pa){
 int removePage(uint64 va){
   struct proc *p = myproc();
   if (p->pid < 3)
+    return 0;
+  if (p->inExec)
     return 0;
 
   acquire(&p->lock);
