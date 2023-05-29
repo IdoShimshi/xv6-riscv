@@ -119,8 +119,8 @@ int             removePage(pagetable_t pagetable,uint64 va);
 int             copySwapFile(struct proc *parent, struct proc* p);
 void            printMetadata(struct proc *p);
 void            initMetadata(struct proc *p);
-int             addToQueue(int index);
-int             removeFromQueueByPolicy();
+int             addToQueue(int index, struct proc* p);
+int             removeFromQueueByPolicy(struct proc* p);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

@@ -47,6 +47,19 @@ proc_mapstacks(pagetable_t kpgtbl)
   }
 }
 
+void printBinary(uint value) {
+  char binary[33];  // 32 bits + null terminator
+  binary[32] = '\0';  // Null terminator
+
+  // Convert the value to binary representation
+  for (int i = 31; i >= 0; i--) {
+    binary[i] = (value & 1) ? '1' : '0';
+    value >>= 1;
+  }
+
+  // Print the binary representation
+  printf("%s\n", binary);
+}
 // initialize the proc table.
 void
 procinit(void)
@@ -469,6 +482,9 @@ void updateDatastructures(struct proc *p){
         p->swapMetadata[i].agingCounter = p->swapMetadata[i].agingCounter | (1 << 31);
         *pt &= ~PTE_A;
      }
+    //  if(p->swapMetadata[i].agingCounter>0){
+    //   printf("%d: %x|",i,p->swapMetadata[i].agingCounter);
+    //  }
     }
   }
 };
@@ -750,11 +766,12 @@ int findSmallestFreeFileIndex(struct proc *p){
 int countOnes(uint input) {
   int count = 0;
   while (input != 0) {
-    count += input & 1;  // Check the least significant bit
-    input >>= 1;        // Shift input right by 1 bit
+    input &= (input - 1); // Clears the rightmost set bit
+    count++;
   }
   return count;
 }
+
 int pageSwapPolicy(struct proc *p){
   int lowestCounter = -1;
   int ans=0;
@@ -774,12 +791,39 @@ int pageSwapPolicy(struct proc *p){
   //SWAP_ALGO=LAPA
   // finds the page with the lowest numbers of one's at agingCounter
   if(SWAP_POLICY == LAPA){
-    lowestCounter = countOnes(p->swapMetadata[0].agingCounter);
-    ans = 0;
+    int j =0;
+    uint lowestValue=0;
+    lowestCounter = 0;
+    //init for first one in ram as minimum 
+    while(j<32){
+        if(p->swapMetadata[j].pa!=0  && p->swapMetadata[j].inFile == -1){
+          lowestCounter = countOnes(p->swapMetadata[j].agingCounter);
+          ans = j;
+          lowestValue = p->swapMetadata[j].agingCounter;
+          break;
+        }
+        j++;           
+    }
+
+    if(j>31)
+      printf("policy2 error: probably no index to remove\n");
+
+    //find the real minimum 
     for(i = 0;i < MAX_TOTAL_PAGES;i++){
-      if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
+      if(p->swapMetadata[i].pa !=0 && p->swapMetadata[i].inFile==-1 && countOnes(p->swapMetadata[i].agingCounter) <= lowestCounter){
+        if(countOnes(p->swapMetadata[i].agingCounter) == lowestCounter){
+          if(p->swapMetadata[i].agingCounter < lowestValue){
+            lowestCounter = countOnes(p->swapMetadata[i].agingCounter);
+            ans = i;
+            lowestValue = p->swapMetadata[i].agingCounter;
+          }
+        }
+        else{
         lowestCounter = countOnes(p->swapMetadata[i].agingCounter);
         ans = i;
+        lowestValue = p->swapMetadata[i].agingCounter;
+        }
+        
       }
     }
     return ans;
@@ -787,12 +831,13 @@ int pageSwapPolicy(struct proc *p){
   //SWAP_ALGO=SCFIFO
   // 
   if(SWAP_POLICY == SCFIFO){
-    // for(i;i<MAX_TOTAL_PAGES;i++){
-    //   if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
-    //     lowestCounter = countOnes(p->swapMetadata[i].agingCounter);
-    //     ans = i;
-    //   }
-    // }
+    int removedIndex = removeFromQueueByPolicy(p);
+    
+    if(removedIndex==-1){
+      printf("error in 3 Policy: index to remove failed\n");
+    }
+    ans = removedIndex;
+    
     return ans;
   }
 
@@ -819,6 +864,9 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
       p->swapMetadata[index].inFile = -1;
       p->swapMetadata[index].agingCounter = 0;
       p->pagesInRam++;
+      //if(policy2)
+      if(1)
+        p->swapMetadata[index].agingCounter = 0xFFFFFFFF;
       release(&p->lock);
       if (readFromSwapFile(p, (char*)pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE)
         return -1;
@@ -836,16 +884,22 @@ int getPageFromSwapFile(struct proc *p, uint64 va){
 int swapPageOut(struct proc *p){
   // evicts a page from proc p's pages in ram.
   int metadataIndex = pageSwapPolicy(p);
+  //printMetadata(p);
+
   pte_t* toSwapEntry = walk(p->pagetable, p->swapMetadata[metadataIndex].va, 0);
   int fileIndex;
   if((fileIndex = findSmallestFreeFileIndex(p)) == -1){
     return -1; 
   }
-  // printf("page %d being swapped out to fileIndex: %d\n", metadataIndex, fileIndex);
+
+   //printf("page %d being swapped out to fileIndex: %d\n", metadataIndex, fileIndex);
+   //printf("%p %p %p %p \n", p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE);
   if (writeToSwapFile(p, (char*) p->swapMetadata[metadataIndex].pa, fileIndex*PGSIZE, PGSIZE) < PGSIZE){
     return -1;
   }
+
   kfree((void*) p->swapMetadata[metadataIndex].pa);
+
   *toSwapEntry |= PTE_PG;
   *toSwapEntry &= ~PTE_V;
   
@@ -899,7 +953,7 @@ foundptbl1:
 
   if (p->pid < 3)
     return 0;
-  // printf("in new page, pid %d has %d pages in ram, %d in total\n",p->pid, p->pagesInRam, p->pageNum);
+  //printf("in new page, pid %d has %d pages in ram, %d in total\n",p->pid, p->pagesInRam, p->pageNum);
 
   if (++(p->pageNum) > MAX_TOTAL_PAGES && p->pid > 2){
     printf("Max total pages exceeded\n");
@@ -919,6 +973,14 @@ foundptbl1:
       p->swapMetadata[i].pa = pa;
       p->swapMetadata[i].inFile = -1;
       p->swapMetadata[i].agingCounter = 0;
+      //if(policy2)
+      if(SWAP_POLICY == LAPA)
+        p->swapMetadata[i].agingCounter = 0xFFFFFFFF;
+
+      //if(policy3)
+      if(SWAP_POLICY == SCFIFO)
+        addToQueue(i,p);
+      // printMetadata(p);
       return 0;
     }
   }
@@ -957,13 +1019,118 @@ foundptbl2:
   return -1;
 }
 
-  int addToQueue(int index){
-    return 0;
-  };
-  int removeFromQueueByPolicy(){
-    return 0;
-  };
 
+void printMyQueue(struct proc * pr){
+  struct  proc * p = pr;
+  int current = p->clock_hand;
+  int prev = p->swapMetadata[current].prev;
+  int old_current =p->swapMetadata[prev].next;
+  printf("| %d (last %d)",current,prev);
+  old_current = current;
+  current = p->swapMetadata[current].next;
+  prev = p->swapMetadata[current].prev;
+  while(current != p->clock_hand)
+  {
+    printf("-> %d (%d) ",current,(prev==old_current));
+    old_current = current;
+    current = p->swapMetadata[current].next;
+    prev = p->swapMetadata[current].prev;
+
+  }
+  printf("\n");
+}
+
+
+int getQueueSize(){
+  return myproc()->queueCurrentSize;
+}
+
+int addToQueue(int index, struct proc* pr){
+  struct proc* p = pr;
+  int old_last=0;
+
+  //invalid index or full queue
+  if(index<0 || index > 31 || getQueueSize() ==16)
+    return -1;
+  // already in queue
+  if(p->swapMetadata[index].next != 0)
+    return -1;
+  if(p->queueCurrentSize==0){
+    p->clock_hand=index;
+    p->swapMetadata[index].next=index;
+    p->swapMetadata[index].prev=index;
+  }
+
+  else{
+    old_last = p->swapMetadata[p->clock_hand].prev;
+    // update first prev
+    p->swapMetadata[p->clock_hand].prev = index;
+    // link the new one as last in queue
+    p->swapMetadata[index].next = p->clock_hand;
+    p->swapMetadata[index].prev = old_last;
+    //update old last in queue.next
+    p->swapMetadata[old_last].next = index;
+  }
+
+  p->queueCurrentSize++;
+  //debug print
+  //printf("index: %d was added\n",index);
+  //printMyQueue(p);
+  return index;
+}
+
+int removeFromQueueByPolicy(struct proc * pr){
+  struct proc* p = pr;
+  int round=0;
+  pte_t *pt;
+  //no need to remove page
+  if(p->pagesInRam<16){
+    printf("error: called removeFromQueueByPolicy() but RAM not 16/16");
+    return -1;
+  }
+  while(round<17){
+    round++;
+    pt = walk(p->pagetable, p->swapMetadata[p->clock_hand].va, 0);
+    // if Access Bit On
+    // Turn in off and skip this link
+    if (*pt & PTE_A) {
+      *pt &= ~PTE_A; // Clear the PTE_A bit
+      p->clock_hand = p->swapMetadata[p->clock_hand].next;
+    }
+    // Access by already off
+    else{
+
+      int temp = p->clock_hand;
+      p->clock_hand = p->swapMetadata[p->clock_hand].next;
+      // printf("before removing?\n");
+      // printMyQueue(p);
+      // prev.next will be my next now
+      p->swapMetadata[p->swapMetadata[temp].prev].next = p->swapMetadata[temp].next;
+      // next.prev will be my prev
+      p->swapMetadata[p->swapMetadata[temp].next].prev = p->swapMetadata[temp].prev;
+      p->swapMetadata[temp].next = 0;
+      p->swapMetadata[temp].prev = 0;
+
+      // p->clock_hand = p->swapMetadata[p->clock_hand].next;
+      // //  prev.next will by my next now
+      // p->swapMetadata[p->swapMetadata[p->clock_hand].prev].next=p->swapMetadata[p->clock_hand].next;
+      // // next.prev will by my prev
+      // p->swapMetadata[p->swapMetadata[p->clock_hand].next].prev=p->swapMetadata[p->clock_hand].prev;
+      // p->swapMetadata[p->clock_hand].next=0;
+      // p->swapMetadata[p->clock_hand].prev=0;
+      //debug print
+      // if(p->clock_hand==16){
+      //   printf("");
+      // }
+
+      // printf("index %d was removed?\n",temp);
+      // printMyQueue(p);
+      return p->clock_hand;
+      }
+  }
+
+  return -1;
+}
 
 void printMetadata(struct proc *p){
   pte_t *pte;
@@ -996,6 +1163,11 @@ void initMetadata(struct proc *p){
     p->swapMetadata[i].pa = 0;
     p->swapMetadata[i].inFile = -1;
     p->swapMetadata[i].agingCounter = 0;
+    //if(policy2)
+    if(1)
+      p->swapMetadata[i].agingCounter = 0xFFFFFFFF;
+    p->swapMetadata[i].next = 0;
+    p->swapMetadata[i].prev = 0;
   }
   
 }
