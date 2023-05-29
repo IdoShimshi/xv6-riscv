@@ -48,6 +48,27 @@ TOOLPREFIX := $(shell if riscv64-unknown-elf-objdump -i 2>&1 | grep 'elf64-big' 
 	echo "***" 1>&2; exit 1; fi)
 endif
 
+
+ifndef SWAP_ALGO
+	SWAP_ALGO=SCFIFO
+endif
+
+ifeq ($(SWAP_ALGO), NFUA)
+	SWAP_ALGO_ = 1
+endif
+
+ifeq ($(SWAP_ALGO), LAPA)
+	SWAP_ALGO_ = 2
+endif
+
+ifeq ($(SWAP_ALGO), SCFIFO)
+	SWAP_ALGO_ = 3
+endif
+
+ifeq ($(SWAP_ALGO), NONE)
+	SWAP_ALGO_ = 4
+endif
+
 QEMU = qemu-system-riscv64
 
 CC = $(TOOLPREFIX)gcc
@@ -71,6 +92,7 @@ ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
 CFLAGS += -fno-pie -nopie
 endif
 
+CFLAGS += -D SWAP_ALGO=$(SWAP_ALGO_)
 LDFLAGS = -z max-page-size=4096
 
 $K/kernel: $(OBJS) $K/kernel.ld $U/initcode

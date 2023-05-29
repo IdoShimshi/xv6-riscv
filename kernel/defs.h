@@ -206,3 +206,18 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+#define NFUA 1
+#define LAPA 2
+#define SCFIFO 3
+#define NONE 4
+
+#if SWAP_ALGO == NFUA
+  #define SWAP_POLICY NFUA
+#elif SWAP_ALGO == LAPA
+  #define SWAP_POLICY LAPA
+#elif SWAP_ALGO == SCFIFO
+  #define SWAP_POLICY SCFIFO
+#else
+  #define SWAP_POLICY NONE
+#endif

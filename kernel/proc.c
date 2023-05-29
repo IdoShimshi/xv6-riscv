@@ -459,7 +459,8 @@ wait(uint64 addr)
 
 void updateDatastructures(struct proc *p){
   int i=0;
-
+  if (p->pid < 3)
+    return;
   for(i = 0;i<MAX_TOTAL_PAGES;i++){
     if(p->swapMetadata[i].inFile == -1 && p->swapMetadata[i].pa != 0){
       pte_t *pt = walk(p->pagetable, p->swapMetadata[i].va, 0);
@@ -502,12 +503,15 @@ scheduler(void)
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
-
+        if (p->pid > 2){
+          updateDatastructures(p);
+        }
+        
+        
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
-      // updateDatastructures(p);
       release(&p->lock);
     }
   }
@@ -756,21 +760,20 @@ int pageSwapPolicy(struct proc *p){
   int ans=0;
   int i=0;
   //SWAP_ALGO=NFUA
-  if(1){
+  if(SWAP_POLICY == NFUA){
     for(i = 0; i < MAX_TOTAL_PAGES ;i++){
       if (p->swapMetadata[i].inFile == -1 && p->swapMetadata[i].pa != 0){ //make sure page in ram
         if(p->swapMetadata[i].agingCounter < lowestCounter || lowestCounter == -1){
           lowestCounter = p->swapMetadata[i].agingCounter;
           ans = i;
+        }
       }
-      }
-      
     }
     return ans;
   }
   //SWAP_ALGO=LAPA
   // finds the page with the lowest numbers of one's at agingCounter
-  if(2){
+  if(SWAP_POLICY == LAPA){
     lowestCounter = countOnes(p->swapMetadata[0].agingCounter);
     ans = 0;
     for(i = 0;i < MAX_TOTAL_PAGES;i++){
@@ -783,7 +786,7 @@ int pageSwapPolicy(struct proc *p){
   }
   //SWAP_ALGO=SCFIFO
   // 
-  if(3){
+  if(SWAP_POLICY == SCFIFO){
     // for(i;i<MAX_TOTAL_PAGES;i++){
     //   if(p->swapMetadata[i].va !=0 && p->swapMetadata[i].inFile==-1 && countOnes(p->swapMetadata[i].agingCounter) < lowestCounter){
     //     lowestCounter = countOnes(p->swapMetadata[i].agingCounter);
@@ -793,7 +796,7 @@ int pageSwapPolicy(struct proc *p){
     return ans;
   }
 
-
+  printf("no policy chosen\n");
   return 0;
 }
 
@@ -916,7 +919,6 @@ foundptbl1:
       p->swapMetadata[i].pa = pa;
       p->swapMetadata[i].inFile = -1;
       p->swapMetadata[i].agingCounter = 0;
-      // printMetadata(p);
       return 0;
     }
   }
@@ -965,35 +967,24 @@ foundptbl2:
 
 void printMetadata(struct proc *p){
   pte_t *pte;
-  int pte_u, pte_pg, is_tramp, is_trapf;
+  int pte_a;
+  
   printf("proc - %d, %s\n", p->pid, p->name);
   printf("proc metadata:\n");
   for (int i = 0; i < MAX_TOTAL_PAGES; i++)
   {
     struct pagingMetadata pm = p->swapMetadata[i];
-    if (p->swapMetadata[i].va != 0 || p->swapMetadata[i].pa != 0 || p->swapMetadata[i].inFile != -1){
+    if (pm.va != 0 || pm.pa != 0 || pm.inFile != -1){
       pte = walk(p->pagetable,pm.va, 0);
-      if ((*pte & PTE_PG) == 0)
-        pte_pg = 0;
+      if ((*pte & PTE_A) == 0)
+        pte_a = 0;
       else 
-        pte_pg = 1;
-      if ((*pte & PTE_U) == 0)
-        pte_u = 0;
-      else 
-        pte_u = 1;
-      if (pm.va != TRAPFRAME)
-        is_trapf = 0;
-      else 
-        is_trapf = 1;
-      if (pm.va != TRAMPOLINE)
-        is_tramp = 0;
-      else 
-        is_tramp = 1;
+        pte_a = 1;
 
-      printf("i: %d | va: %x | pa: %x | inFile: %d | pte_u: %d | pte_pg: %d | is_tramp: %d | is_trapf: %d| :\n",i, pm.va, pm.pa, pm.inFile, pte_u, pte_pg, is_tramp, is_trapf );
+      printf("i: %d | va: %x | pa: %x | inFile: %d | agingCounter: %x  | pte_a: %d | :\n",i, pm.va, pm.pa, pm.inFile, pm.agingCounter, pte_a);
     }
-    else
-      printf("i: %d |     unused            va: %x | pa: %x | inFile: %d                | :\n",i, pm.va, pm.pa, pm.inFile);
+    // else
+    //   printf("i: %d |     unused            va: %x | pa: %x | inFile: %d                | :\n",i, pm.va, pm.pa, pm.inFile);
   }
   
 }

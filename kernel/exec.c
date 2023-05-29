@@ -35,6 +35,15 @@ exec(char *path, char **argv)
   struct pagingMetadata tempSwapMetadata[MAX_TOTAL_PAGES];
   int tempPageNum;
   int tempPagesInRam;
+
+  begin_op();
+
+  if((ip = namei(path)) == 0){
+    end_op();
+    return -1;
+  }
+  ilock(ip);
+
   for (int i = 0;  i < MAX_TOTAL_PAGES; i++) {
         tempSwapMetadata[i] = p->swapMetadata[i];
     }
@@ -45,14 +54,6 @@ exec(char *path, char **argv)
   initMetadata(p);
   p->pageNum = 0;
   p->pagesInRam = 0;
-
-  begin_op();
-
-  if((ip = namei(path)) == 0){
-    end_op();
-    return -1;
-  }
-  ilock(ip);
 
   // Check ELF header
   if(readi(ip, 0, (uint64)&elf, 0, sizeof(elf)) != sizeof(elf))
