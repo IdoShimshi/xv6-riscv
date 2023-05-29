@@ -83,9 +83,12 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
   
 struct pagingMetadata {
+  // unused - pa == 0, va == 0, inFile == -1
+  // in ram - pa != 0, inFile == -1
+  // in file - pa == 0, infile != -1
   uint64 pa;
-  uint64 va; // 0 if no page
-  int inFile; // -1 if in ram, else will contain index in file
+  uint64 va; 
+  int inFile; 
   uint agingCounter;
   int next;
   int prev;

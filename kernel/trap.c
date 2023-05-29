@@ -66,7 +66,7 @@ usertrap(void)
 
     syscall();
   }
-  else if(r_scause() == 13 || r_scause() == 15){
+  else if(r_scause() == 13 || r_scause() == 15 || r_scause() == 12){
     uint64 va = r_stval();
     pte_t *entry = walk(p->pagetable, va, 0);
     if ((*entry & PTE_PG) == 0){

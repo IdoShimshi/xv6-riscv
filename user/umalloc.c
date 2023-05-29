@@ -38,9 +38,7 @@ free(void *ap)
     p->s.size += bp->s.size;
     p->s.ptr = bp->s.ptr;
   } else{
-    printf("before\n");
     p->s.ptr = bp;
-    printf("after\n");
   }
   freep = p;
 }
