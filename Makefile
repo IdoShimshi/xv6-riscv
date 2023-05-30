@@ -92,7 +92,7 @@ ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]nopie'),)
 CFLAGS += -fno-pie -nopie
 endif
 
-CFLAGS += -D SWAP_ALGO=$(SWAP_ALGO_)
+CFLAGS += -DSWAP_ALGO=$(SWAP_ALGO_)
 LDFLAGS = -z max-page-size=4096
 
 $K/kernel: $(OBJS) $K/kernel.ld $U/initcode
@@ -156,6 +156,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_task1\
 	$U/_task2\
+	$U/_task3\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

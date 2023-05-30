@@ -248,7 +248,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-    newPage(pagetable, a, (uint64)mem);
+    if (newPage(pagetable, a, (uint64)mem) == -1){
+      kfree(mem);
+      pte_t *pte = walk(pagetable,a,0);
+      *pte = 0;
+      return 0;
+    }
+      
   }
   return newsz;
 }

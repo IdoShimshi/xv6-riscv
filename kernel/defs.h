@@ -121,6 +121,8 @@ void            printMetadata(struct proc *p);
 void            initMetadata(struct proc *p);
 int             addToQueue(int index, struct proc* p);
 int             removeFromQueueByPolicy(struct proc* p);
+void            removeFromQueue(struct proc * p, int index);
+void            printMyQueue(struct proc * pr);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
