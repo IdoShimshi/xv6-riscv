@@ -70,7 +70,7 @@ usertrap(void)
     uint64 va = r_stval();
     pte_t *entry = walk(p->pagetable, va, 0);
     if ((*entry & PTE_PG) == 0){
-      printf("usertrap(): my segmentation fault %p pid=%d\n", r_scause(), p->pid);
+      printf("usertrap(): segmentation fault %p pid=%d\n", r_scause(), p->pid);
       printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
       setkilled(p);
     }

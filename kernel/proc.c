@@ -948,6 +948,8 @@ int copySwapFile(struct proc *parent, struct proc* p) {
 }
 
 int newPage(pagetable_t pagetable, uint64 va, uint64 pa){
+  if (SWAP_POLICY == NONE)
+    return 0;
   struct proc *p = myproc();
   if (p->inExec)
     goto foundptbl1;
@@ -997,6 +999,8 @@ foundptbl1:
 }
 
 int removePage(pagetable_t pagetable, uint64 va){
+  if (SWAP_POLICY == NONE)
+    return 0;
   struct proc *p = myproc();
   if (p->inExec)
     return 0;
