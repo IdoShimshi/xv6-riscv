@@ -1,19 +1,6 @@
 #include "kernel/types.h"
 
-
-typedef long Align;
-
-union header {
-  struct {
-    union header *ptr;
-    uint size;
-  } s;
-  Align x;
-};
-
-typedef union header Header;
-
-
+#define PGSIZE 4096
 
 void* ustack_malloc(uint len);
 

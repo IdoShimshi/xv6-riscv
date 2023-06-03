@@ -6,11 +6,20 @@
 int
 main(int argc, char *argv[])
 {
-    ustack_malloc(400);
-    char* p = ustack_malloc(250);
-    p = "hello";
-    printf("%s\n",p);
-    printf("first: %d\n",ustack_free());
-    printf("second: %d\n",ustack_free());
+  for (int i = 0; i < 20; i++)
+  {
+     ustack_malloc(512- 16);
+  }
+  for (int i = 0; i < 20; i++)
+  {
+     printf("freed output: %d\n",ustack_free());
+  }
+  ustack_malloc(512- 16);
+  printf("freed output: %d\n",ustack_free());
+
+  printf("freed output: %d\n",ustack_free());
+
+  ustack_malloc(512- 16);
+  printf("freed output: %d\n",ustack_free());
   exit(0);
 }

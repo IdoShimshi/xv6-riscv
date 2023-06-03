@@ -1,45 +1,101 @@
 #include "ustack.h"
 #include "user/user.h"
+#include "kernel/types.h"
+#include "kernel/stat.h"
+#include "kernel/param.h"
 
-static Header *top;
+typedef long Align;
+union header {
+  struct {
+    uint len;
+    uint dealloc_page;
+    union header* prev;
+  } s;
+  Align x;
+};
 
-void* ustack_malloc(uint len){
-    printf("%d\n",sizeof(Header));
-    if (len > 512)
-        return (void*)-1;
+typedef union header Header;
+
+static Header base;
+static Header* top;
+char* cur_addr;
+int now_init = 1;
+
+void* ustack_malloc(uint len1) {
+  if (len1 > 512)
+    return (void*)-1;
+
+  Header* p;
+  char* ret;
+  if (now_init){
+    now_init = 0;
+    cur_addr = sbrk(PGSIZE);
+    if (cur_addr == (char*) -1){
+      printf("sbrk failed\n");
+      return (void*) -1;
+    }
     
-    Header *p;
-    uint nunits;
-    nunits = (len + sizeof(Header) - 1)/sizeof(Header) + 1;
+    base.s.prev = 0;
+    base.s.dealloc_page = 0;
+    base.s.len = 0;
+    top = &base;
+  }
 
-    p = (Header*)sbrk(nunits * sizeof(Header));
-    if(p == (Header*)-1)
-        return (void*)-1;
-
-    p->s.size = nunits;
-    if (top == 0)
-        p->s.ptr = 0;
-    else
-        p->s.ptr = top;
-    top = p;
+  p = (Header*)cur_addr;
+  p->s.len = len1 + sizeof(Header);
+  
+  // no extra page needed
+  if (top->s.dealloc_page + p->s.len < PGSIZE) {
     
+    p->s.dealloc_page = top->s.dealloc_page + p->s.len;
+    
+    ret = cur_addr + sizeof(Header);
+    cur_addr = cur_addr + p->s.len;
+  }
+  // let's bring new page
+  else {
+    char* temp = sbrk(PGSIZE);
+    if (temp == (char*) -1){
+      printf("sbrk failed\n");
+      return (void*) -1;
+    }
+    // sanitiy check1
+    if(temp < cur_addr)
+        printf("error:sbrk addr < ustack saved cur_addr\n");
 
-    return (void*)(p + 1);
+    p->s.dealloc_page = top->s.dealloc_page + p->s.len - PGSIZE;
+    ret = cur_addr + sizeof(Header);
+    cur_addr = cur_addr + p->s.len;
+
+    // sanitiy check2
+    if(temp > cur_addr)
+        printf("error:sbrk addr > ustack new cur_addr\n");
+  }
+  p->s.prev = top;
+  top = p;
+
+
+  return ret;
 }
 
-int ustack_free(void){
-    Header *p;
-    int ret;
-    if (top == 0)
-        return -1;
-    p = top;
-    ret = (p->s.size - 1) * sizeof(Header);
-    if (top->s.ptr == 0)
-        top = 0;
-    else
-        top = p->s.ptr;
+int ustack_free(void) {
+  Header* p;
+  uint ret;
 
-    if (sbrk(-1 * (p->s.size * sizeof(Header))) == (char*)-1)
-        return -1;
-    return ret;
+  if (top == 0 || top == &base){
+    printf("ustack_free(): stack empty\n");
+    return -1;
+  }
+
+  p = top;
+  ret = p->s.len - sizeof(Header); // return value
+  top = p->s.prev; // pop out of stack
+
+  // printf("dealoc: %d, len: %d\n",p->s.dealloc_page, p->s.len);
+  if (((int)p->s.dealloc_page) - ((int)p->s.len) < 0) { // if buffer size crosses bytes used on page free
+    sbrk(-PGSIZE);
+  }
+  cur_addr = cur_addr - p->s.len;
+
+  return ret;
 }
