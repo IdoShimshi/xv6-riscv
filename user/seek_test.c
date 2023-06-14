@@ -199,34 +199,3 @@ test_seek(int print) {
   close(fd);
   return 1;
 }
-
-
-// #include "kernel/types.h"
-// #include "user.h"
-// #include "kernel/fcntl.h"
-
-
-// void test_seek(int fd, int offset, int whence) {
-//     int new_offset = seek(fd, offset, whence);
-//     printf("seek ret value: %d\n", new_offset);
-// }
-
-// int main(void) {
-//     int fd;
-
-//     // Open a file for testing
-//     if ((fd = open("testfile.txt", O_CREATE|O_RDWR)) < 0) {
-//         printf("Error opening file!\n");
-//         exit(1);
-//     }
-
-//     // Perform seek operations and print the resulting offset
-//     test_seek(fd, 10, SEEK_SET);
-//     test_seek(fd, 20, SEEK_CUR);
-//     test_seek(fd, -5, SEEK_CUR);
-
-//     // Close the file
-//     close(fd);
-
-//     exit(0);
-// }

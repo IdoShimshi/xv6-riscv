@@ -6,7 +6,7 @@
 #include "kernel/fcntl.h"
 #endif
 
-//#include "random_test.c"
+#include "random_test.c"
 #include "seek_test.c"
 
 int main(int argc, char** argv)
@@ -37,15 +37,15 @@ int main(int argc, char** argv)
             return 0;
         }
     }
-    // else
-    // {
-    //     if (random)
-    //     {
-    //         printf("RANDOM TESTS:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-    //         test_random(print);
-    //         return 0;
-    //     }
-    // }
+    else
+    {
+        if (random)
+        {
+            printf("RANDOM TESTS:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+            test_random(print);
+            return 0;
+        }
+    }
 
     int success = 0;
     printf("SEEK TESTS:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
@@ -53,7 +53,7 @@ int main(int argc, char** argv)
     printf("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     printf("\nPRNG TESTS:\n~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-    //success += test_random(print);
+    success += test_random(print);
     printf("\n\n");
     if (success == 2)
         printf("SUCCESS!! PASSED ALL TESTS!\n");

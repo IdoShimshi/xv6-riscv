@@ -22,6 +22,10 @@ void            consoleinit(void);
 void            consoleintr(int);
 void            consputc(int);
 
+// random.c
+void            randominit(void);
+uint8           lfsr_char(uint8 lfsr);
+
 // exec.c
 int             exec(char*, char**);
 
